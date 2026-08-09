@@ -26,6 +26,9 @@ zerops:
       deployFiles: gui/dist/~
       cache:
         - gui/node_modules
+      envVariables:
+        VITE_API_HTTP_URL: https://api-2d4c-8000.prg1.zerops.app
+        VITE_API_WS_URL: wss://api-2d4c-8000.prg1.zerops.app
     run:
       base: static
       documentRoot: /
