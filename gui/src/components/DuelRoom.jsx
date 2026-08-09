@@ -2,7 +2,7 @@ import { useState } from "react";
 import Timer from "./Timer.jsx";
 import CommentaryFeed from "./CommentaryFeed.jsx";
 
-export default function DuelRoom({ duel, socket, onEnd }) {
+export default function DuelRoom({ duel, myPlayerId, socket, onEnd }) {
   const [answer, setAnswer] = useState("");
   const [remaining, setRemaining] = useState(duel.duration);
   const [lines, setLines] = useState([]);
@@ -112,7 +112,7 @@ export default function DuelRoom({ duel, socket, onEnd }) {
         <div className={`result-banner ${result.timed_out ? "timeout" : ""}`}>
           <h2>
             {result.winner_id
-              ? result.winner_id === duel.you
+              ? result.winner_id === (myPlayerId || duel.player_id)
                 ? "🏆 VICTORY IS YOURS!"
                 : "💀 MATCH LOST"
               : "⏱️ TIME EXPIRED"}

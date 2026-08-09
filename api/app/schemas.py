@@ -1,5 +1,5 @@
 """Pydantic request/response models."""
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class JoinQueueRequest(BaseModel):
@@ -7,19 +7,18 @@ class JoinQueueRequest(BaseModel):
 
 
 class JoinQueueResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     player_id: str
     nickname: str
     rating: int
 
 
 class LeaderboardEntry(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     nickname: str
     rating: int
     wins: int
     losses: int
-
-    class Config:
-        from_attributes = True
 
 
 class SubmitAnswerRequest(BaseModel):

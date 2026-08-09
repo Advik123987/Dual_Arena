@@ -7,6 +7,7 @@ export default function App() {
   const [nickname, setNickname] = useState("");
   const [status, setStatus] = useState("idle"); // idle | queueing | in_duel | ended
   const [duel, setDuel] = useState(null);
+  const [myPlayerId, setMyPlayerId] = useState(null);
   const socketRef = useRef(null);
 
   const startQueue = async (e) => {
@@ -15,8 +16,9 @@ export default function App() {
     try {
       setStatus("queueing");
       const { player_id } = await joinQueue(nickname.trim());
+      setMyPlayerId(player_id);
 
-      const duelRef = { room_id: null };
+      const duelRef = { room_id: null, player_id };
 
       const socket = openDuelSocket(player_id, {
         duel_start: (msg) => {
@@ -81,6 +83,7 @@ export default function App() {
       {status === "in_duel" && duel && (
         <DuelRoom
           duel={duel}
+          myPlayerId={myPlayerId}
           socket={socketRef.current}
           onEnd={() => setStatus("ended")}
         />

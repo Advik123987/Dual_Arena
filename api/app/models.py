@@ -1,6 +1,7 @@
 """SQLAlchemy models: players, matches, weak-area tracking, leaderboard."""
 import uuid
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import String, Integer, Float, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -35,15 +36,15 @@ class Match(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
     player_a_id: Mapped[str] = mapped_column(String, ForeignKey("players.id"))
     player_b_id: Mapped[str] = mapped_column(String, ForeignKey("players.id"))
-    winner_id: Mapped[str] = mapped_column(String, nullable=True)
+    winner_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     problem_category: Mapped[str] = mapped_column(String)
     problem_payload: Mapped[dict] = mapped_column(JSON)
 
     started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    ended_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     player_a_correct: Mapped[bool] = mapped_column(default=False)
     player_b_correct: Mapped[bool] = mapped_column(default=False)
-    player_a_time_seconds: Mapped[float] = mapped_column(Float, nullable=True)
-    player_b_time_seconds: Mapped[float] = mapped_column(Float, nullable=True)
+    player_a_time_seconds: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    player_b_time_seconds: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
