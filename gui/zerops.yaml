@@ -1,0 +1,16 @@
+zerops:
+  - setup: gui
+    build:
+      base: nodejs@20
+      buildCommands:
+        - npm install
+        - npm run build
+      deployFiles: dist/~
+      cache:
+        - node_modules
+      envVariables:
+        VITE_API_HTTP_URL: https://api-<project-subdomain>.zerops.app
+        VITE_API_WS_URL: wss://api-<project-subdomain>.zerops.app
+    run:
+      base: static
+      documentRoot: dist

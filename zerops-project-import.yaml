@@ -1,0 +1,32 @@
+project:
+  name: duel-arena
+
+services:
+  - hostname: db
+    type: postgresql@14
+    mode: NON_HA
+
+  - hostname: cache
+    type: valkey@7
+    mode: NON_HA
+
+  - hostname: api
+    type: python@3.11
+    envSecrets:
+      GROQ_API_KEY: <fill-in-in-zerops-gui>
+      # Zerops auto-generates connectionString-style envs per service.
+      # Confirm exact var names in the Zerops GUI (Service > envVariables tab)
+      # after db/cache are created — they are typically exposed as below.
+      DATABASE_URL: ${db_connectionString}
+      CACHE_URL: ${cache_connectionString}
+    verticalAutoscaling:
+      minCpu: 1
+      maxCpu: 2
+      minRam: 0.5
+      maxRam: 1
+    ports:
+      - port: 8000
+        httpSupport: true
+
+  - hostname: gui
+    type: static@1
