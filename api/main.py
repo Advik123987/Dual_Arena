@@ -8,7 +8,7 @@ from app import matchmaking
 from app.config import settings
 from app.db import init_models
 from app.routers.leaderboard import router as leaderboard_router
-from app.websocket_manager import get_room, manager
+from app.websocket_manager import check_and_send_active_room, get_room, manager
 
 
 @asynccontextmanager
@@ -37,18 +37,23 @@ async def health():
 @app.websocket("/ws/{player_id}")
 async def duel_socket(websocket: WebSocket, player_id: str):
     await manager.connect(player_id, websocket)
+    await check_and_send_active_room(player_id)
     try:
         while True:
             msg = await websocket.receive_json()
             action = msg.get("action")
 
-            if action == "submit_answer":
+            if action == "join_queue":
+                await check_and_send_active_room(player_id)
+
+            elif action == "submit_answer":
                 room = get_room(msg.get("room_id"))
                 if room is not None:
                     await room.handle_submission(player_id, msg.get("answer", ""))
 
             elif action == "ping":
                 await websocket.send_json({"type": "pong"})
+
 
     except WebSocketDisconnect:
         manager.disconnect(player_id)

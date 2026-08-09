@@ -65,8 +65,16 @@ async def _call_groq(model: str, category: str) -> dict:
     async with httpx.AsyncClient(timeout=15) as client:
         resp = await client.post(GROQ_URL, json=payload, headers=headers)
         resp.raise_for_status()
-        content = resp.json()["choices"][0]["message"]["content"]
+        content = resp.json()["choices"][0]["message"]["content"].strip()
+        if content.startswith("```"):
+            lines = content.splitlines()
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].startswith("```"):
+                lines = lines[:-1]
+            content = "\n".join(lines).strip()
         return json.loads(content)
+
 
 
 async def generate_problem(weak_areas_a: dict, weak_areas_b: dict) -> dict:

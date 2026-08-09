@@ -4,8 +4,14 @@ from sqlalchemy.orm import DeclarativeBase
 
 from app.config import normalized_database_url
 
-engine = create_async_engine(normalized_database_url(), pool_pre_ping=True, pool_size=5, max_overflow=5)
+url = normalized_database_url()
+if url.startswith("sqlite"):
+    engine = create_async_engine(url, connect_args={"check_same_thread": False})
+else:
+    engine = create_async_engine(url, pool_pre_ping=True, pool_size=5, max_overflow=5)
+
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+
 
 
 class Base(DeclarativeBase):

@@ -8,13 +8,17 @@ reconnecting player doesn't lose their match state just because they
 dropped the socket.
 """
 import json
+import logging
 from typing import Any, Optional
 
 import redis.asyncio as redis
 
 from app.config import settings
 
+logger = logging.getLogger(__name__)
+
 _client: Optional[redis.Redis] = None
+_in_memory_cache: dict[str, str] = {}
 
 
 def get_client() -> redis.Redis:
@@ -25,13 +29,27 @@ def get_client() -> redis.Redis:
 
 
 async def set_room_state(room_id: str, state: dict, ttl_seconds: int = 3600) -> None:
-    await get_client().set(f"room:{room_id}", json.dumps(state), ex=ttl_seconds)
+    data = json.dumps(state)
+    try:
+        await get_client().set(f"room:{room_id}", data, ex=ttl_seconds)
+    except Exception as e:
+        logger.warning(f"Valkey/Redis set failed (using in-memory fallback): {e}")
+        _in_memory_cache[f"room:{room_id}"] = data
 
 
 async def get_room_state(room_id: str) -> Optional[dict]:
-    raw = await get_client().get(f"room:{room_id}")
+    try:
+        raw = await get_client().get(f"room:{room_id}")
+    except Exception as e:
+        logger.warning(f"Valkey/Redis get failed (using in-memory fallback): {e}")
+        raw = _in_memory_cache.get(f"room:{room_id}")
     return json.loads(raw) if raw else None
 
 
 async def delete_room_state(room_id: str) -> None:
-    await get_client().delete(f"room:{room_id}")
+    try:
+        await get_client().delete(f"room:{room_id}")
+    except Exception as e:
+        logger.warning(f"Valkey/Redis delete failed (using in-memory fallback): {e}")
+        _in_memory_cache.pop(f"room:{room_id}", None)
+

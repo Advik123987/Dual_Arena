@@ -186,3 +186,31 @@ class DuelRoom:
 
 def get_room(room_id: str) -> DuelRoom | None:
     return _active_rooms.get(room_id)
+
+
+async def check_and_send_active_room(player_id: str) -> None:
+    for room in list(_active_rooms.values()):
+        if player_id in room.player_ids and not room.finished:
+            pa = room.state["player_a"]
+            pb = room.state["player_b"]
+            is_a = (player_id == pa["player_id"])
+            you_nick = pa["nickname"] if is_a else pb["nickname"]
+            opp_nick = pb["nickname"] if is_a else pa["nickname"]
+
+            problem = room.state["problem"]
+            public_problem = {k: v for k, v in problem.items() if k not in ("correct_answer", "test_cases", "_generation_error")}
+
+            elapsed = time.time() - room.state["started_at"]
+            remaining = max(0, int(room.state["duration"] - elapsed))
+
+            start_payload = {
+                "type": "duel_start",
+                "room_id": room.room_id,
+                "duration": remaining,
+                "problem": public_problem,
+                "opponent": opp_nick,
+                "you": you_nick,
+            }
+            await manager.send(player_id, start_payload)
+            break
+
