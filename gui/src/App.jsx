@@ -205,6 +205,7 @@ export default function App() {
       mode: 'sprint',
       solo: true,
       problem: problem,
+      isPractice: true,
     });
     setStatus('in_duel');
     setActiveTab('arena');

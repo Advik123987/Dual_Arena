@@ -40,14 +40,40 @@ export default function DuelRoom({ duel, myPlayerId, socket, onEnd, isSpectator 
     };
   }, [duel, myPlayerId]);
 
-  const handleSubmit = (ans = answer) => {
+  const handleSubmit = async (ans = answer) => {
     if (isSpectator) return;
-    if (socket && socket.readyState === WebSocket.OPEN) {
+    if (socket && socket.readyState === WebSocket.OPEN && !duel.isPractice) {
       socket.send(JSON.stringify({
         action: 'submit_answer',
         room_id: duel.room_id,
         answer: ans
       }));
+    } else {
+      // Practice mode or fallback: HTTP grading
+      try {
+        const res = await runTests(duel.problem, ans);
+        setSubmitFlash(res.success ? 'correct' : 'wrong');
+        setTimeout(() => setSubmitFlash(null), 800);
+        if (res.success) {
+          setResult({
+            winner_id: myPlayerId,
+            timed_out: false,
+            solo: true,
+            rating_delta: 5,
+            post_mortem: {
+              optimal_complexity: "Optimal Practice Execution",
+              key_insight: "Great job! All test cases passed successfully.",
+              pro_tip: "Keep practicing to boost your algorithmic speed in 1v1 duels!"
+            }
+          });
+          if (window.confetti) {
+            window.confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+          }
+        }
+      } catch (err) {
+        setSubmitFlash('wrong');
+        setTimeout(() => setSubmitFlash(null), 800);
+      }
     }
   };
 
@@ -59,7 +85,7 @@ export default function DuelRoom({ duel, myPlayerId, socket, onEnd, isSpectator 
       const res = await runTests(duel.problem, answer);
       setTestResults(res);
     } catch (err) {
-      setTestResults({ success: False, error: err.message, test_results: [] });
+      setTestResults({ success: false, error: err.message, test_results: [] });
     } finally {
       setRunningTests(false);
     }
