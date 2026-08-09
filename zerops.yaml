@@ -12,7 +12,7 @@ zerops:
         - port: 8000
           httpSupport: true
       prepareCommands:
-        - python3 -m pip install -r requirements.txt --ignore-installed
+        - python3 -m pip install --break-system-packages -r api/requirements.txt
       envVariables:
         PORT: 8000
       start: uvicorn main:app --host 0.0.0.0 --port 8000
@@ -34,8 +34,8 @@ zerops:
         VITE_API_HTTP_URL: https://api-2d4c-8000.prg1.zerops.app
         VITE_API_WS_URL: wss://api-2d4c-8000.prg1.zerops.app
     run:
+      os: alpine
       base: static
       ports:
         - port: 80
           httpSupport: true
-
