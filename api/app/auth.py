@@ -1,7 +1,8 @@
-"""Auth utilities: password hashing (bcrypt) + JWT tokens (python-jose).
+"""Auth utilities: password hashing (bcrypt + sha256 fallback) + JWT tokens (python-jose).
 
 Token payload: {"sub": player_id, "nickname": nickname, "exp": ...}
 """
+import hashlib
 from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
@@ -10,18 +11,32 @@ from passlib.context import CryptContext
 from app.config import settings
 
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 ALGORITHM = "HS256"
 
 
 # ── Password helpers ──────────────────────────────────────────────────────────
 
+def _fallback_hash(plain: str) -> str:
+    salt = settings.SECRET_KEY[:16]
+    return "sha256$" + hashlib.sha256((salt + plain).encode("utf-8")).hexdigest()
+
+
 def hash_password(plain: str) -> str:
-    return _pwd_context.hash(plain)
+    try:
+        return _pwd_context.hash(plain)
+    except Exception:
+        return _fallback_hash(plain)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return _pwd_context.verify(plain, hashed)
+    if not hashed:
+        return False
+    if hashed.startswith("sha256$"):
+        return _fallback_hash(plain) == hashed
+    try:
+        return _pwd_context.verify(plain, hashed)
+    except Exception:
+        return _fallback_hash(plain) == hashed
 
 
 # ── JWT helpers ───────────────────────────────────────────────────────────────
