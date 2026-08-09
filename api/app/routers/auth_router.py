@@ -37,19 +37,33 @@ class AuthResponse(BaseModel):
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
     """Create a new account. Nickname must be unique; password must be ≥6 chars."""
-    if len(req.nickname.strip()) < 2:
+    clean_nick = req.nickname.strip()
+    if len(clean_nick) < 2:
         raise HTTPException(400, "Nickname must be at least 2 characters.")
     if len(req.password) < 6:
         raise HTTPException(400, "Password must be at least 6 characters.")
 
     # Check nickname taken
-    result = await db.execute(select(Player).where(Player.nickname == req.nickname.strip()))
+    result = await db.execute(select(Player).where(Player.nickname == clean_nick))
     existing = result.scalar_one_or_none()
     if existing is not None:
-        raise HTTPException(409, "Nickname already taken. Choose another or log in.")
+        # If created pre-auth (no password set), claim it now!
+        if existing.password_hash is None:
+            existing.password_hash = hash_password(req.password)
+            await db.commit()
+            await db.refresh(existing)
+            token = create_access_token(existing.id, existing.nickname)
+            return AuthResponse(
+                player_id=existing.id,
+                nickname=existing.nickname,
+                rating=existing.rating,
+                win_streak=existing.win_streak,
+                token=token,
+            )
+        raise HTTPException(409, f"Nickname '{clean_nick}' is already registered. If this is your account, please click 'Login' above.")
 
     player = Player(
-        nickname=req.nickname.strip(),
+        nickname=clean_nick,
         password_hash=hash_password(req.password),
     )
     db.add(player)
@@ -69,18 +83,21 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
 @router.post("/login", response_model=AuthResponse)
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     """Login with nickname + password. Returns a JWT token."""
-    result = await db.execute(select(Player).where(Player.nickname == req.nickname.strip()))
+    clean_nick = req.nickname.strip()
+    result = await db.execute(select(Player).where(Player.nickname == clean_nick))
     player = result.scalar_one_or_none()
 
     if player is None:
-        raise HTTPException(401, "Nickname not found. Register first.")
+        raise HTTPException(401, f"Nickname '{clean_nick}' not found. Please click 'Register' tab to create your account!")
 
-    # Players created before auth was added have no password_hash — force them to re-register
+    # Pre-auth account: set password on first login
     if player.password_hash is None:
-        raise HTTPException(401, "Account has no password set. Please register a new account.")
+        player.password_hash = hash_password(req.password)
+        await db.commit()
+        await db.refresh(player)
 
     if not verify_password(req.password, player.password_hash):
-        raise HTTPException(401, "Incorrect password.")
+        raise HTTPException(401, "Incorrect password. Please check your password and try again.")
 
     token = create_access_token(player.id, player.nickname)
     return AuthResponse(

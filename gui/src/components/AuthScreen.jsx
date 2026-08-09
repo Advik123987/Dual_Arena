@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { register, login, saveSession } from '../api.js';
 
 export default function AuthScreen({ onAuth }) {
-  const [mode, setMode] = useState('login'); // 'login' | 'register'
+  const [mode, setMode] = useState('register'); // Default to 'register' for new competitors
   const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -13,10 +13,10 @@ export default function AuthScreen({ onAuth }) {
     e.preventDefault();
     setError('');
 
-    if (!nickname.trim()) return setError('Nickname is required.');
+    if (!nickname.trim()) return setError('Please enter a nickname.');
     if (password.length < 6) return setError('Password must be at least 6 characters.');
     if (mode === 'register' && password !== confirmPassword)
-      return setError('Passwords do not match.');
+      return setError('Passwords do not match. Please re-type your password.');
 
     setLoading(true);
     try {
@@ -45,29 +45,29 @@ export default function AuthScreen({ onAuth }) {
         <div className="auth-logo">
           <span className="auth-logo-icon">⚔️</span>
           <h1 className="auth-title">DUAL ARENA</h1>
-          <p className="auth-subtitle">1v1 Competitive Coding Battles</p>
+          <p className="auth-subtitle">Real-Time AI 1v1 Coding Battle Platform</p>
         </div>
 
         {/* Tab Toggle */}
         <div className="auth-tabs">
+          <button
+            className={`auth-tab ${mode === 'register' ? 'active' : ''}`}
+            onClick={() => { setMode('register'); setError(''); }}
+          >
+            🚀 Register Account
+          </button>
           <button
             className={`auth-tab ${mode === 'login' ? 'active' : ''}`}
             onClick={() => { setMode('login'); setError(''); }}
           >
             🔑 Login
           </button>
-          <button
-            className={`auth-tab ${mode === 'register' ? 'active' : ''}`}
-            onClick={() => { setMode('register'); setError(''); }}
-          >
-            🚀 Register
-          </button>
         </div>
 
         {/* Form */}
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="auth-field">
-            <label className="auth-label">Competitor Nickname</label>
+            <label className="auth-label">Competitor Callsign / Nickname</label>
             <input
               className="input-field"
               type="text"
@@ -109,6 +109,30 @@ export default function AuthScreen({ onAuth }) {
           {error && (
             <div className="auth-error">
               ⚠️ {error}
+              {error.includes("not found") && mode === 'login' && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="auth-link"
+                    onClick={() => { setMode('register'); setError(''); }}
+                    style={{ color: '#fff', fontWeight: 700 }}
+                  >
+                    👉 Click here to Register as '{nickname}'
+                  </button>
+                </div>
+              )}
+              {error.includes("already registered") && mode === 'register' && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="auth-link"
+                    onClick={() => { setMode('login'); setError(''); }}
+                    style={{ color: '#fff', fontWeight: 700 }}
+                  >
+                    👉 Click here to Login as '{nickname}'
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -119,24 +143,24 @@ export default function AuthScreen({ onAuth }) {
           >
             {loading
               ? <span className="auth-spinner" />
-              : mode === 'login' ? '⚡ Enter the Arena' : '🚀 Create Account'}
+              : mode === 'register' ? '🚀 Create Account & Enter Arena' : '⚡ Login & Enter Arena'}
           </button>
         </form>
 
         {/* Footnote */}
         <p className="auth-footer">
-          {mode === 'login'
-            ? <>No account? <button className="auth-link" onClick={() => { setMode('register'); setError(''); }}>Register here</button></>
-            : <>Already a fighter? <button className="auth-link" onClick={() => { setMode('login'); setError(''); }}>Log in</button></>
+          {mode === 'register'
+            ? <>Already registered? <button className="auth-link" onClick={() => { setMode('login'); setError(''); }}>Log in here</button></>
+            : <>New competitor? <button className="auth-link" onClick={() => { setMode('register'); setError(''); }}>Create account</button></>
           }
         </p>
 
         {/* Feature bullets */}
         <div className="auth-features">
-          <span>🏆 Persistent Rankings</span>
-          <span>🔥 Win Streak Tracking</span>
+          <span>🏆 Reserved Username</span>
+          <span>🔥 Rating &amp; Streak Tracking</span>
           <span>☕ Python &amp; Java</span>
-          <span>⚔️ Direct Challenges</span>
+          <span>⚔️ Direct PvP Challenges</span>
         </div>
       </div>
     </div>
