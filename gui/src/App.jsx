@@ -14,6 +14,7 @@ import ProblemBank from './components/ProblemBank';
 import LearningHub from './components/LearningHub';
 import DailyChallengeCard from './components/DailyChallengeCard';
 import TournamentModal from './components/TournamentModal';
+import HomePage from './components/HomePage';
 import { joinQueue, leaveQueue, openDuelSocket, loadSession, clearSession, verifyToken } from './api.js';
 import {
   playMatchFound, playTimerPulse, playCorrect, playWrong,
@@ -26,13 +27,14 @@ export default function App() {
   const [authChecking, setAuthChecking] = useState(true);
   const [muted, setMuted] = useState(getMuteState());
 
-  // Tab Navigation state: 'arena' | 'problems' | 'learning' | 'leaderboard'
-  const [activeTab, setActiveTab] = useState('arena');
+  // Default to 'home' tab so visitors see the Home Page landing first!
+  const [activeTab, setActiveTab] = useState('home');
 
   // Modals State
   const [selectedProfileId, setSelectedProfileId] = useState(null);
   const [showPrivateModal, setShowPrivateModal] = useState(false);
   const [showTournamentModal, setShowTournamentModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Restore session on mount
   useEffect(() => {
@@ -58,6 +60,7 @@ export default function App() {
     setMyRating(data.rating);
     setMyWinStreak(data.win_streak);
     setAuthed(true);
+    setShowAuthModal(false);
   };
 
   const handleLogout = () => {
@@ -68,6 +71,7 @@ export default function App() {
     setDuel(null);
     setNickname('');
     setMyPlayerId('');
+    setActiveTab('home');
   };
 
   const handleToggleMute = () => {
@@ -182,7 +186,7 @@ export default function App() {
     setDuel({
       room_id: 'practice-' + (problem.id || 'prob'),
       duration: 1800,
-      you: nickname,
+      you: nickname || 'Guest Player',
       opponent: null,
       difficulty: problem.difficulty || 'medium',
       language: problem.language || 'python',
@@ -197,7 +201,7 @@ export default function App() {
 
   const handleLeaderboardChallenge = (entry) => {
     if (!nickname.trim()) {
-      alert("Please enter a nickname first to challenge someone.");
+      alert("Please log in or enter a nickname first to challenge someone.");
       return;
     }
     if (status !== 'idle') {
@@ -253,48 +257,60 @@ export default function App() {
     );
   }
 
-  if (!authed) {
-    return (
-      <div className="app">
-        <ParticleBackground />
-        <AuthScreen onAuth={handleAuth} />
-      </div>
-    );
-  }
-
   return (
     <div className="app">
       <ParticleBackground />
 
       <header className="app-header">
-        <h1>DUAL ARENA</h1>
+        <h1 style={{ cursor: 'pointer' }} onClick={() => setActiveTab('home')}>DUAL ARENA</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', justifyContent: 'center', marginTop: '0.5rem' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            👤 <strong style={{ color: 'var(--accent-cyan)', cursor: 'pointer' }} onClick={() => setSelectedProfileId(myPlayerId)}>{nickname}</strong>
-            &nbsp;·&nbsp; ⭐ {myRating}
-            {myWinStreak >= 2 && <span style={{ color: 'var(--accent-orange)' }}> &nbsp;🔥{myWinStreak}</span>}
-          </span>
-          <button className="btn-secondary" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }} onClick={() => setSelectedProfileId(myPlayerId)}>
-            My Profile
-          </button>
-          <button className="btn-secondary" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }} onClick={handleToggleMute}>
-            {muted ? '🔇 Muted' : '🔊 Sound On'}
-          </button>
-          <button className="btn-danger" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }} onClick={handleLogout}>
-            Logout
-          </button>
+          {authed ? (
+            <>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                👤 <strong style={{ color: 'var(--accent-cyan)', cursor: 'pointer' }} onClick={() => setSelectedProfileId(myPlayerId)}>{nickname}</strong>
+                &nbsp;·&nbsp; ⭐ {myRating}
+                {myWinStreak >= 2 && <span style={{ color: 'var(--accent-orange)' }}> &nbsp;🔥{myWinStreak}</span>}
+              </span>
+              <button className="btn-secondary" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }} onClick={() => setSelectedProfileId(myPlayerId)}>
+                My Profile
+              </button>
+              <button className="btn-secondary" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }} onClick={handleToggleMute}>
+                {muted ? '🔇 Muted' : '🔊 Sound On'}
+              </button>
+              <button className="btn-danger" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }} onClick={handleLogout}>
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="btn-secondary" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }} onClick={handleToggleMute}>
+                {muted ? '🔇 Muted' : '🔊 Sound On'}
+              </button>
+              <button className="btn-primary" style={{ padding: '0.3rem 1.2rem', fontSize: '0.85rem' }} onClick={() => setShowAuthModal(true)}>
+                🔑 Login / Register
+              </button>
+            </>
+          )}
         </div>
       </header>
 
-      {/* Top Tab Navigation */}
+      {/* Top Navigation Bar */}
       {status === 'idle' && (
         <Navigation activeTab={activeTab} onSelectTab={setActiveTab} />
+      )}
+
+      {/* Home Page Tab */}
+      {status === 'idle' && activeTab === 'home' && (
+        <HomePage
+          authed={authed}
+          onNavigate={setActiveTab}
+          onOpenAuth={() => setShowAuthModal(true)}
+        />
       )}
 
       {/* Arena Tab */}
       {status === 'idle' && activeTab === 'arena' && (
         <>
-          {/* Daily Challenge Banner */}
           <DailyChallengeCard onSolveDaily={handlePracticeProblem} />
 
           <div className="lobby-container">
@@ -356,8 +372,10 @@ export default function App() {
               <button
                 className="btn-primary"
                 style={{ flex: 2 }}
-                onClick={handleStartQueue}
-                disabled={!nickname.trim()}
+                onClick={() => {
+                  if (!authed) setShowAuthModal(true);
+                  else handleStartQueue();
+                }}
               >
                 ⚡ FIND MATCH
               </button>
@@ -460,6 +478,14 @@ export default function App() {
           language={language}
           onClose={() => setShowTournamentModal(false)}
         />
+      )}
+
+      {showAuthModal && (
+        <div className="challenge-modal-overlay" onClick={() => setShowAuthModal(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '440px' }}>
+            <AuthScreen onAuth={handleAuth} />
+          </div>
+        </div>
       )}
 
       {status === 'queueing' && !pendingChallenge && (

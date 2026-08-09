@@ -4,6 +4,12 @@ export default function Navigation({ activeTab, onSelectTab }) {
   return (
     <nav className="nav-bar">
       <button
+        className={`nav-tab ${activeTab === 'home' ? 'active' : ''}`}
+        onClick={() => onSelectTab('home')}
+      >
+        🏠 Home
+      </button>
+      <button
         className={`nav-tab ${activeTab === 'arena' ? 'active' : ''}`}
         onClick={() => onSelectTab('arena')}
       >
