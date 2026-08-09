@@ -7,6 +7,8 @@ import ActiveDuels from './components/ActiveDuels';
 import OnlinePlayers from './components/OnlinePlayers';
 import Leaderboard from './components/Leaderboard';
 import ChallengeModal from './components/ChallengeModal';
+import ProfileModal from './components/ProfileModal';
+import PrivateRoomModal from './components/PrivateRoomModal';
 import { joinQueue, leaveQueue, openDuelSocket, loadSession, clearSession, verifyToken } from './api.js';
 
 function playBeep(freq = 800, duration = 0.1) {
@@ -41,9 +43,13 @@ function playWinSound() {
 
 export default function App() {
   const [nickname, setNickname] = useState('');
-  // ── Auth state ────────────────────────────────────────────────────────────
   const [authed, setAuthed] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
+
+  // Modals & Spectator State
+  const [selectedProfileId, setSelectedProfileId] = useState(null);
+  const [showPrivateModal, setShowPrivateModal] = useState(false);
+  const [spectatorDuel, setSpectatorDuel] = useState(null);
 
   // Restore session on mount
   useEffect(() => {
@@ -82,22 +88,20 @@ export default function App() {
   };
 
   // ── Game state ────────────────────────────────────────────────────────────
-  const [status, setStatus] = useState('idle'); // idle | queueing | in_duel | ended
-  
+  const [status, setStatus] = useState('idle'); // idle | queueing | in_duel | spectating
   const [duel, setDuel] = useState(null);
   const [myPlayerId, setMyPlayerId] = useState('');
   const [myRating, setMyRating] = useState(1000);
   const [myWinStreak, setMyWinStreak] = useState(0);
-  
+
   const [difficulty, setDifficulty] = useState('medium');
   const [language, setLanguage] = useState('python');
   const [mode, setMode] = useState('full_battle');
-  
+
   const socketRef = useRef(null);
   const duelRef = useRef(null);
   const [pendingChallenge, setPendingChallenge] = useState(null);
 
-  // Sync duelRef with duel state for WebSocket handlers
   useEffect(() => {
     duelRef.current = duel;
   }, [duel]);
@@ -109,7 +113,7 @@ export default function App() {
       setMyPlayerId(data.player_id);
       setMyRating(data.rating);
       setMyWinStreak(data.win_streak);
-      
+
       setStatus('queueing');
 
       socketRef.current = openDuelSocket(data.player_id, nickname, data.rating, data.win_streak, {
@@ -164,14 +168,25 @@ export default function App() {
     setStatus('idle');
   };
 
-  const handleSoloStarted = () => {
-    // startSolo API called inside QueueCountdown, just wait for WS duel_start
-  };
-
   const handleEndDuel = () => {
     if (socketRef.current) socketRef.current.close();
     setDuel(null);
     setStatus('idle');
+  };
+
+  const handleSpectate = (activeDuel) => {
+    setDuel({
+      room_id: activeDuel.room_id,
+      duration: activeDuel.remaining,
+      you: activeDuel.player_a,
+      opponent: activeDuel.player_b,
+      difficulty: activeDuel.difficulty,
+      language: activeDuel.language,
+      mode: activeDuel.mode,
+      solo: activeDuel.solo,
+      problem: { category: activeDuel.category, prompt: "Spectating Live Duel...", type: "code" }
+    });
+    setStatus('spectating');
   };
 
   const handleLeaderboardChallenge = (entry) => {
@@ -183,28 +198,26 @@ export default function App() {
       alert("You must be idle to issue a challenge.");
       return;
     }
-    
-    // Quick auto-join to get a socket, then send challenge
+
     joinQueue(nickname, difficulty, language, mode).then(data => {
       setMyPlayerId(data.player_id);
       socketRef.current = openDuelSocket(data.player_id, nickname, data.rating, data.win_streak, {
-         challenge_declined: (msg) => {
-           alert(`${msg.declining_nickname} declined your challenge.`);
-           socketRef.current.close();
-           setStatus('idle');
-         },
-         duel_start: (msg) => {
-           setDuel({
-             ...msg,
-             you: msg.player_a_id === data.player_id ? msg.player_a : msg.player_b,
-             opponent: msg.player_a_id === data.player_id ? msg.player_b : msg.player_a
-           });
-           setStatus('in_duel');
-           setPendingChallenge(null);
-         }
+        challenge_declined: (msg) => {
+          alert(`${msg.declining_nickname} declined your challenge.`);
+          socketRef.current.close();
+          setStatus('idle');
+        },
+        duel_start: (msg) => {
+          setDuel({
+            ...msg,
+            you: msg.player_a_id === data.player_id ? msg.player_a : msg.player_b,
+            opponent: msg.player_a_id === data.player_id ? msg.player_b : msg.player_a
+          });
+          setStatus('in_duel');
+          setPendingChallenge(null);
+        }
       });
-      
-      // Wait for socket to open then send challenge
+
       socketRef.current.onopen = () => {
         socketRef.current.send(JSON.stringify({
           action: "challenge",
@@ -215,8 +228,8 @@ export default function App() {
           mode
         }));
       };
-      
-      setStatus('queueing'); // Waiting for their response
+
+      setStatus('queueing');
     }).catch(err => console.error(err));
   };
 
@@ -245,16 +258,19 @@ export default function App() {
   return (
     <div className="app">
       <ParticleBackground />
-      
+
       <header className="app-header">
         <h1>DUAL ARENA</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'center', marginTop: '0.5rem' }}>
           <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            👤 <strong style={{ color: 'var(--accent-cyan)' }}>{nickname}</strong>
+            👤 <strong style={{ color: 'var(--accent-cyan)', cursor: 'pointer' }} onClick={() => setSelectedProfileId(myPlayerId)}>{nickname}</strong>
             &nbsp;·&nbsp; ⭐ {myRating}
             {myWinStreak >= 2 && <span style={{ color: 'var(--accent-orange)' }}> &nbsp;🔥{myWinStreak}</span>}
           </span>
-          <button className="btn-danger" style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }} onClick={handleLogout}>
+          <button className="btn-secondary" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }} onClick={() => setSelectedProfileId(myPlayerId)}>
+            My Profile
+          </button>
+          <button className="btn-danger" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }} onClick={handleLogout}>
             Logout
           </button>
         </div>
@@ -303,29 +319,29 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '1rem', maxWidth: '600px', margin: '0 auto' }}>
-              <input 
-                type="text" 
-                className="input-field" 
-                placeholder="Enter your Competitor Nickname"
-                value={nickname}
-                onChange={e => setNickname(e.target.value)}
-                maxLength={20}
-              />
-              <button 
-                className="btn-primary" 
+            <div style={{ display: 'flex', gap: '1rem', maxWidth: '640px', margin: '0 auto' }}>
+              <button
+                className="btn-secondary"
+                style={{ flex: 1 }}
+                onClick={() => setShowPrivateModal(true)}
+              >
+                🔑 Private Room
+              </button>
+              <button
+                className="btn-primary"
+                style={{ flex: 2 }}
                 onClick={handleStartQueue}
                 disabled={!nickname.trim()}
               >
-                FIND MATCH
+                ⚡ FIND MATCH
               </button>
             </div>
           </div>
 
           <div className="side-by-side">
-            <ActiveDuels />
-            <OnlinePlayers 
-              myPlayerId={myPlayerId} 
+            <ActiveDuels onSpectate={handleSpectate} />
+            <OnlinePlayers
+              myPlayerId={myPlayerId}
               difficulty={difficulty}
               language={language}
               mode={mode}
@@ -334,47 +350,70 @@ export default function App() {
             />
           </div>
 
-          <Leaderboard onChallenge={handleLeaderboardChallenge} />
+          <Leaderboard
+            onChallenge={handleLeaderboardChallenge}
+            onSelectPlayer={(pid) => setSelectedProfileId(pid)}
+          />
         </>
       )}
 
       {status === 'queueing' && (
-        <QueueCountdown 
+        <QueueCountdown
           difficulty={difficulty}
           language={language}
           mode={mode}
           nickname={nickname}
           playerId={myPlayerId}
-          onSolo={handleSoloStarted}
+          onSolo={() => {}}
           onKeepWaiting={() => {}}
         />
       )}
 
-      {status === 'in_duel' && duel && (
-        <DuelRoom 
-          duel={duel} 
-          myPlayerId={myPlayerId} 
+      {(status === 'in_duel' || status === 'spectating') && duel && (
+        <DuelRoom
+          duel={duel}
+          myPlayerId={myPlayerId}
           socket={socketRef.current}
           onEnd={handleEndDuel}
+          isSpectator={status === 'spectating'}
         />
       )}
 
       {pendingChallenge && (
-        <ChallengeModal 
+        <ChallengeModal
           challenge={pendingChallenge}
           myNickname={nickname}
           socket={socketRef.current}
-          onAccept={(id) => {
-            setPendingChallenge(null);
-            // WS handles duel_start transition automatically
-          }}
+          onAccept={(id) => setPendingChallenge(null)}
           onDecline={(id) => {
             setPendingChallenge(null);
             if (status === 'queueing') handleCancelQueue();
           }}
         />
       )}
-      
+
+      {selectedProfileId && (
+        <ProfileModal
+          playerId={selectedProfileId}
+          onClose={() => setSelectedProfileId(null)}
+        />
+      )}
+
+      {showPrivateModal && (
+        <PrivateRoomModal
+          playerId={myPlayerId}
+          nickname={nickname}
+          difficulty={difficulty}
+          language={language}
+          mode={mode}
+          onRoomJoined={(data) => {
+            // Private room created/joined
+            setStatus('queueing');
+          }}
+          onClose={() => setShowPrivateModal(false)}
+        />
+      )}
+
       {status === 'queueing' && !pendingChallenge && (
         <div style={{ textAlign: 'center', marginTop: '1rem' }}>
           <button className="btn-danger" onClick={handleCancelQueue}>Cancel Queue</button>

@@ -25,7 +25,7 @@ class Player(Base):
     losses: Mapped[int] = mapped_column(Integer, default=0)
     win_streak: Mapped[int] = mapped_column(Integer, default=0)
     weak_areas: Mapped[dict] = mapped_column(JSON, default=dict)
-
+    achievements: Mapped[list] = mapped_column(JSON, default=list)
 
 
 class Match(Base):
@@ -41,6 +41,7 @@ class Match(Base):
     language: Mapped[Optional[str]] = mapped_column(String, nullable=True, default="python")
     mode: Mapped[Optional[str]] = mapped_column(String, nullable=True, default="full_battle")
     is_solo: Mapped[bool] = mapped_column(Boolean, default=False)
+    room_code: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     player_a_correct: Mapped[bool] = mapped_column(Boolean, default=False)

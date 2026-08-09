@@ -34,7 +34,7 @@ export async function register(nickname, password) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || "Registration failed");
-  return data; // {player_id, nickname, rating, win_streak, token}
+  return data;
 }
 
 export async function login(nickname, password) {
@@ -45,7 +45,7 @@ export async function login(nickname, password) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || "Login failed");
-  return data; // {player_id, nickname, rating, win_streak, token}
+  return data;
 }
 
 export async function verifyToken(token) {
@@ -81,6 +81,37 @@ export async function startSolo(playerId, nickname, difficulty, language, mode) 
     body: JSON.stringify({ player_id: playerId, nickname, difficulty, language, mode }),
   });
   if (!res.ok) throw new Error("Failed to start solo match");
+  return res.json();
+}
+
+export async function createPrivateRoom(playerId, nickname, difficulty, language, mode) {
+  const res = await fetch(`${API_HTTP_URL}/api/rooms/private/create`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ player_id: playerId, nickname, difficulty, language, mode }),
+  });
+  if (!res.ok) throw new Error("Failed to create private room");
+  return res.json();
+}
+
+export async function joinPrivateRoom(playerId, nickname, roomCode) {
+  const res = await fetch(`${API_HTTP_URL}/api/rooms/private/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ player_id: playerId, nickname, room_code: roomCode }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Failed to join private room");
+  return data;
+}
+
+export async function runTests(problem, answer) {
+  const res = await fetch(`${API_HTTP_URL}/api/run-tests`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ problem, answer }),
+  });
+  if (!res.ok) throw new Error("Failed to run tests");
   return res.json();
 }
 

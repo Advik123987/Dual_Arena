@@ -1,14 +1,7 @@
-"""Connection registry + duel-room lifecycle.
-
-New features:
-- Solo mode (no opponent, vs the clock)
-- Challenge system (player A challenges player B directly)
-- Win streak tracking
-- Rating delta in duel_end message
-- Active rooms listing
-- Language/mode/difficulty stored in room state
-"""
+"""Connection registry + duel-room lifecycle with spectator support, achievements & post-mortem."""
 import asyncio
+import random
+import string
 import time
 from datetime import datetime
 
@@ -20,13 +13,14 @@ from app.config import settings, MODE_DURATIONS
 from app.db import AsyncSessionLocal
 from app.judge import judge_submission
 from app.models import Match, Player
+from app.postmortem import generate_post_mortem
 from app.problem_gen import generate_problem
+from app.ranks import get_rank_tier
 
 
 class ConnectionManager:
     def __init__(self) -> None:
         self.active: dict[str, WebSocket] = {}
-        # player_id -> {nickname, rating, win_streak}
         self.online_meta: dict[str, dict] = {}
 
     async def connect(self, player_id: str, ws: WebSocket, meta: dict | None = None) -> None:
@@ -53,29 +47,38 @@ class ConnectionManager:
 
     def get_online_players(self) -> list[dict]:
         return [
-            {"player_id": pid, **meta}
+            {"player_id": pid, **meta, "tier": get_rank_tier(meta.get("rating", 1000))}
             for pid, meta in self.online_meta.items()
         ]
 
 
 manager = ConnectionManager()
 _active_rooms: dict[str, "DuelRoom"] = {}
-# Pending direct challenges: challenger_id -> {target_id, difficulty, language, mode, from_nickname}
 _pending_challenges: dict[str, dict] = {}
+_private_rooms: dict[str, str] = {}  # room_code -> creator_player_id
+
+
+def generate_room_code() -> str:
+    return "DUEL-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
 
 
 async def _get_player_info(player_id: str) -> dict:
     async with AsyncSessionLocal() as db:
         player = await db.get(Player, player_id)
         if player:
-            return {"weak_areas": player.weak_areas, "rating": player.rating, "win_streak": player.win_streak}
-        return {"weak_areas": {}, "rating": 1000, "win_streak": 0}
+            return {
+                "weak_areas": player.weak_areas,
+                "rating": player.rating,
+                "win_streak": player.win_streak,
+                "achievements": player.achievements or [],
+            }
+        return {"weak_areas": {}, "rating": 1000, "win_streak": 0, "achievements": []}
 
 
 async def start_duel(
     room_id: str, player_a: dict, player_b: dict,
     difficulty: str = "medium", language: str = "python", mode: str = "full_battle",
-    solo: bool = False,
+    solo: bool = False, room_code: str | None = None,
 ) -> None:
     info_a = await _get_player_info(player_a["player_id"])
     info_b = await _get_player_info(player_b["player_id"]) if not solo else info_a
@@ -98,6 +101,7 @@ async def start_duel(
         "language": language,
         "mode": mode,
         "solo": solo,
+        "room_code": room_code,
         "results": {},
     }
     await cache.set_room_state(room_id, state)
@@ -115,6 +119,7 @@ async def start_duel(
         "language": language,
         "mode": mode,
         "solo": solo,
+        "room_code": room_code,
     }
 
     if solo:
@@ -152,7 +157,22 @@ class DuelRoom:
                 state["player_a"]["player_id"],
                 state["player_b"]["player_id"],
             ]
+        self.spectators: list[WebSocket] = []
         self.finished = False
+
+    def add_spectator(self, ws: WebSocket) -> None:
+        self.spectators.append(ws)
+
+    def remove_spectator(self, ws: WebSocket) -> None:
+        if ws in self.spectators:
+            self.spectators.remove(ws)
+
+    async def broadcast_spectators(self, message: dict) -> None:
+        for ws in list(self.spectators):
+            try:
+                await ws.send_json(message)
+            except Exception:
+                self.remove_spectator(ws)
 
     async def run(self) -> None:
         duration = self.state["duration"]
@@ -161,13 +181,19 @@ class DuelRoom:
             await asyncio.sleep(1)
             elapsed += 1
             remaining = duration - elapsed
-            await manager.broadcast(self.player_ids, {"type": "tick", "remaining": remaining})
+            msg = {"type": "tick", "remaining": remaining}
+            await manager.broadcast(self.player_ids, msg)
+            await self.broadcast_spectators(msg)
+
             if remaining in (60, 30, 10) and not self.finished:
                 line = await generate_commentary(
                     f"{remaining} seconds left in the duel, {'no winner' if not self.solo else 'still unsolved'}."
                 )
                 if line:
-                    await manager.broadcast(self.player_ids, {"type": "commentary", "line": line})
+                    c_msg = {"type": "commentary", "line": line}
+                    await manager.broadcast(self.player_ids, c_msg)
+                    await self.broadcast_spectators(c_msg)
+
         if not self.finished:
             await self._finalize(winner_id=None, timed_out=True)
 
@@ -179,20 +205,26 @@ class DuelRoom:
         self.state["results"][player_id] = {"correct": correct, "time_seconds": elapsed}
         await cache.set_room_state(self.room_id, self.state)
 
-        # Notify opponent (if not solo)
         if not self.solo:
             opponent_id = next((pid for pid in self.player_ids if pid != player_id), None)
             if opponent_id:
                 await manager.send(opponent_id, {"type": "opponent_progress", "correct": correct})
 
-        # Send result feedback to the submitter
         await manager.send(player_id, {"type": "submission_result", "correct": correct})
+        await self.broadcast_spectators({
+            "type": "spectator_progress",
+            "player_id": player_id,
+            "correct": correct,
+            "time_seconds": elapsed,
+        })
 
         line = await generate_commentary(
             f"A player just {'nailed it' if correct else 'submitted a wrong answer'} at {elapsed:.0f}s."
         )
         if line:
-            await manager.broadcast(self.player_ids, {"type": "commentary", "line": line})
+            c_msg = {"type": "commentary", "line": line}
+            await manager.broadcast(self.player_ids, c_msg)
+            await self.broadcast_spectators(c_msg)
 
         if correct:
             await self._finalize(winner_id=player_id, timed_out=False)
@@ -203,8 +235,12 @@ class DuelRoom:
         pb = self.state["player_b"]
         results = self.state["results"]
 
-        # Compute rating deltas before persisting
+        # Generate AI Post-Mortem Solution Analysis
+        post_mortem = await generate_post_mortem(self.state["problem"])
+
         rating_deltas: dict[str, int] = {}
+        new_achievements: dict[str, list[str]] = {}
+
         async with AsyncSessionLocal() as db:
             match = Match(
                 id=self.room_id,
@@ -217,6 +253,7 @@ class DuelRoom:
                 language=self.state.get("language", "python"),
                 mode=self.state.get("mode", "full_battle"),
                 is_solo=self.solo,
+                room_code=self.state.get("room_code"),
                 ended_at=datetime.utcnow(),
                 player_a_correct=results.get(pa["player_id"], {}).get("correct", False),
                 player_b_correct=results.get(pb["player_id"], {}).get("correct", False) if not self.solo else False,
@@ -231,6 +268,7 @@ class DuelRoom:
                 if player is None:
                     continue
                 got_it_right = results.get(pid, {}).get("correct", False)
+                solve_time = results.get(pid, {}).get("time_seconds", 999)
 
                 # Update weak-areas EMA
                 prev = player.weak_areas.get(category, 0.5)
@@ -238,12 +276,18 @@ class DuelRoom:
                 player.weak_areas = {**player.weak_areas, category: max(0.0, min(1.0, prev + delta))}
 
                 old_rating = player.rating
+                existing_ach = set(player.achievements or [])
+                awarded = []
+
                 if self.solo:
-                    # Solo mode: +10 for correct, 0 for timeout
                     if got_it_right:
                         player.wins += 1
                         player.rating += 10
                         player.win_streak += 1
+                        if solve_time <= 60 and "first_blood" not in existing_ach:
+                            awarded.append("first_blood")
+                        if player.wins >= 3 and "solo_champion" not in existing_ach:
+                            awarded.append("solo_champion")
                     else:
                         player.win_streak = 0
                     rating_deltas[pid] = player.rating - old_rating
@@ -252,26 +296,45 @@ class DuelRoom:
                         player.wins += 1
                         player.rating += 15
                         player.win_streak += 1
+                        if solve_time <= 60 and "first_blood" not in existing_ach:
+                            awarded.append("first_blood")
+                        if player.win_streak >= 3 and "streak_master" not in existing_ach:
+                            awarded.append("streak_master")
+                        if self.state.get("difficulty") == "hard" and "hardcore" not in existing_ach:
+                            awarded.append("hardcore")
+                        if self.state.get("language") == "java" and "polyglot" not in existing_ach:
+                            awarded.append("polyglot")
                     elif winner_id is not None:
                         player.losses += 1
                         player.rating = max(0, player.rating - 10)
                         player.win_streak = 0
                     else:
-                        # Timeout: both lose streak, no rating change
                         player.win_streak = 0
                     rating_deltas[pid] = player.rating - old_rating
 
+                if awarded:
+                    player.achievements = list(existing_ach.union(awarded))
+                    new_achievements[pid] = awarded
+
             await db.commit()
 
-        # Broadcast result with per-player rating delta
+        # Broadcast end payload to players and spectators
+        end_payload = {
+            "type": "duel_end",
+            "winner_id": winner_id,
+            "timed_out": timed_out,
+            "solo": self.solo,
+            "post_mortem": post_mortem,
+        }
+
         for pid in self.player_ids:
             await manager.send(pid, {
-                "type": "duel_end",
-                "winner_id": winner_id,
-                "timed_out": timed_out,
-                "solo": self.solo,
+                **end_payload,
                 "rating_delta": rating_deltas.get(pid, 0),
+                "new_achievements": new_achievements.get(pid, []),
             })
+
+        await self.broadcast_spectators(end_payload)
 
         await cache.delete_room_state(self.room_id)
         _active_rooms.pop(self.room_id, None)
@@ -282,7 +345,6 @@ def get_room(room_id: str) -> "DuelRoom | None":
 
 
 def get_active_rooms() -> list[dict]:
-    """Returns public summaries of all active duel rooms."""
     rooms = []
     for room in _active_rooms.values():
         if room.finished:
@@ -301,6 +363,8 @@ def get_active_rooms() -> list[dict]:
             "difficulty": room.state.get("difficulty", "medium"),
             "language": room.state.get("language", "python"),
             "mode": room.state.get("mode", "full_battle"),
+            "spectators_count": len(room.spectators),
+            "room_code": room.state.get("room_code"),
         })
     return rooms
 
@@ -342,7 +406,6 @@ async def send_challenge(
     to_player_id: str,
     difficulty: str, language: str, mode: str,
 ) -> bool:
-    """Sends a challenge invite to to_player_id. Returns False if player is offline."""
     if to_player_id not in manager.active:
         return False
     _pending_challenges[from_player_id] = {
@@ -364,7 +427,6 @@ async def send_challenge(
 
 
 async def accept_challenge(accepting_player_id: str, accepting_nickname: str, from_player_id: str) -> bool:
-    """Accepts a pending challenge and starts the duel."""
     challenge = _pending_challenges.pop(from_player_id, None)
     if challenge is None or challenge["target_id"] != accepting_player_id:
         return False
@@ -384,7 +446,6 @@ async def accept_challenge(accepting_player_id: str, accepting_nickname: str, fr
 
 
 async def decline_challenge(declining_player_id: str, declining_nickname: str, from_player_id: str) -> None:
-    """Declines a pending challenge and notifies the challenger."""
     _pending_challenges.pop(from_player_id, None)
     await manager.send(from_player_id, {
         "type": "challenge_declined",

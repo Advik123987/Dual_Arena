@@ -1,5 +1,5 @@
 """Pydantic request/response models."""
-from typing import Optional
+from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict
 
 
@@ -20,11 +20,13 @@ class JoinQueueResponse(BaseModel):
 
 class LeaderboardEntry(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+    player_id: str = ""
     nickname: str
     rating: int
     wins: int
     losses: int
     win_streak: int = 0
+    tier: Optional[dict] = None
 
 
 class SoloStartRequest(BaseModel):
@@ -33,6 +35,25 @@ class SoloStartRequest(BaseModel):
     difficulty: str = "medium"
     language: str = "python"
     mode: str = "full_battle"
+
+
+class CreatePrivateRoomRequest(BaseModel):
+    player_id: str
+    nickname: str
+    difficulty: str = "medium"
+    language: str = "python"
+    mode: str = "full_battle"
+
+
+class JoinPrivateRoomRequest(BaseModel):
+    player_id: str
+    nickname: str
+    room_code: str
+
+
+class RunTestsRequest(BaseModel):
+    problem: dict
+    answer: str
 
 
 class SubmitAnswerRequest(BaseModel):
