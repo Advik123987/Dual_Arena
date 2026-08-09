@@ -220,3 +220,38 @@ async def challenge_accept(accepting_player_id: str, accepting_nickname: str, fr
 async def challenge_decline(declining_player_id: str, declining_nickname: str, from_player_id: str):
     await decline_challenge(declining_player_id, declining_nickname, from_player_id)
     return {"status": "declined"}
+
+
+@router.get("/problems")
+async def list_problems(category: str | None = None, difficulty: str | None = None, language: str | None = None, search: str | None = None):
+    from app.curriculum import PROBLEM_BANK
+    res = PROBLEM_BANK
+    if category:
+        res = [p for p in res if p.get("category") == category]
+    if difficulty:
+        res = [p for p in res if p.get("difficulty") == difficulty]
+    if language:
+        res = [p for p in res if p.get("language", "python") == language]
+    if search:
+        s = search.lower()
+        res = [p for p in res if s in p.get("title", "").lower() or s in p.get("prompt", "").lower()]
+    return res
+
+
+@router.get("/problems/{problem_id}")
+async def get_problem(problem_id: str):
+    from app.curriculum import PROBLEM_BANK
+    prob = next((p for p in PROBLEM_BANK if p["id"] == problem_id), None)
+    if not prob:
+        raise HTTPException(404, "Problem not found")
+    return prob
+
+
+@router.get("/recommendations/{player_id}")
+async def get_recommendations(player_id: str, db: AsyncSession = Depends(get_db)):
+    from app.curriculum import generate_learning_recommendations
+    player = await db.get(Player, player_id)
+    weak_areas = player.weak_areas if player else {}
+    recommendations = await generate_learning_recommendations(weak_areas)
+    return recommendations
+

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ParticleBackground from './components/ParticleBackground';
 import AuthScreen from './components/AuthScreen';
+import Navigation from './components/Navigation';
 import QueueCountdown from './components/QueueCountdown';
 import DuelRoom from './components/DuelRoom';
 import ActiveDuels from './components/ActiveDuels';
@@ -9,6 +10,8 @@ import Leaderboard from './components/Leaderboard';
 import ChallengeModal from './components/ChallengeModal';
 import ProfileModal from './components/ProfileModal';
 import PrivateRoomModal from './components/PrivateRoomModal';
+import ProblemBank from './components/ProblemBank';
+import LearningHub from './components/LearningHub';
 import { joinQueue, leaveQueue, openDuelSocket, loadSession, clearSession, verifyToken } from './api.js';
 
 function playBeep(freq = 800, duration = 0.1) {
@@ -46,10 +49,12 @@ export default function App() {
   const [authed, setAuthed] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
 
+  // Tab Navigation state: 'arena' | 'problems' | 'learning' | 'leaderboard'
+  const [activeTab, setActiveTab] = useState('arena');
+
   // Modals & Spectator State
   const [selectedProfileId, setSelectedProfileId] = useState(null);
   const [showPrivateModal, setShowPrivateModal] = useState(false);
-  const [spectatorDuel, setSpectatorDuel] = useState(null);
 
   // Restore session on mount
   useEffect(() => {
@@ -189,6 +194,22 @@ export default function App() {
     setStatus('spectating');
   };
 
+  const handlePracticeProblem = (problem) => {
+    setDuel({
+      room_id: 'practice-' + problem.id,
+      duration: 1800,
+      you: nickname,
+      opponent: null,
+      difficulty: problem.difficulty,
+      language: problem.language || 'python',
+      mode: 'sprint',
+      solo: true,
+      problem: problem,
+    });
+    setStatus('in_duel');
+    setActiveTab('arena');
+  };
+
   const handleLeaderboardChallenge = (entry) => {
     if (!nickname.trim()) {
       alert("Please enter a nickname first to challenge someone.");
@@ -276,7 +297,13 @@ export default function App() {
         </div>
       </header>
 
+      {/* Top Tab Navigation */}
       {status === 'idle' && (
+        <Navigation activeTab={activeTab} onSelectTab={setActiveTab} />
+      )}
+
+      {/* Arena Tab */}
+      {status === 'idle' && activeTab === 'arena' && (
         <>
           <div className="lobby-container">
             <div className="lang-toggle">
@@ -349,14 +376,28 @@ export default function App() {
               myNickname={nickname}
             />
           </div>
-
-          <Leaderboard
-            onChallenge={handleLeaderboardChallenge}
-            onSelectPlayer={(pid) => setSelectedProfileId(pid)}
-          />
         </>
       )}
 
+      {/* Problem Bank Tab */}
+      {status === 'idle' && activeTab === 'problems' && (
+        <ProblemBank onSolveProblem={handlePracticeProblem} />
+      )}
+
+      {/* AI Learning Hub Tab */}
+      {status === 'idle' && activeTab === 'learning' && (
+        <LearningHub playerId={myPlayerId} />
+      )}
+
+      {/* Leaderboard Tab */}
+      {status === 'idle' && activeTab === 'leaderboard' && (
+        <Leaderboard
+          onChallenge={handleLeaderboardChallenge}
+          onSelectPlayer={(pid) => setSelectedProfileId(pid)}
+        />
+      )}
+
+      {/* Queueing State */}
       {status === 'queueing' && (
         <QueueCountdown
           difficulty={difficulty}
@@ -369,6 +410,7 @@ export default function App() {
         />
       )}
 
+      {/* In-Duel or Spectating State */}
       {(status === 'in_duel' || status === 'spectating') && duel && (
         <DuelRoom
           duel={duel}
@@ -407,7 +449,6 @@ export default function App() {
           language={language}
           mode={mode}
           onRoomJoined={(data) => {
-            // Private room created/joined
             setStatus('queueing');
           }}
           onClose={() => setShowPrivateModal(false)}

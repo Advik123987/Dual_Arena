@@ -139,6 +139,31 @@ export async function fetchProfile(playerId) {
   return res.json();
 }
 
+export async function fetchProblems(filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.category) params.append("category", filters.category);
+  if (filters.difficulty) params.append("difficulty", filters.difficulty);
+  if (filters.language) params.append("language", filters.language);
+  if (filters.search) params.append("search", filters.search);
+
+  const res = await fetch(`${API_HTTP_URL}/api/problems?${params.toString()}`);
+  if (!res.ok) throw new Error("Failed to fetch problem bank");
+  return res.json();
+}
+
+export async function fetchProblemById(problemId) {
+  const res = await fetch(`${API_HTTP_URL}/api/problems/${problemId}`);
+  if (!res.ok) throw new Error("Failed to fetch problem detail");
+  return res.json();
+}
+
+export async function fetchRecommendations(playerId) {
+  const res = await fetch(`${API_HTTP_URL}/api/recommendations/${playerId}`);
+  if (!res.ok) throw new Error("Failed to fetch learning recommendations");
+  return res.json();
+}
+
+
 // ── WebSocket ────────────────────────────────────────────────────────────────
 
 export function openDuelSocket(playerId, nickname, rating, winStreak, handlers) {
