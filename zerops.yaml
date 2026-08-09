@@ -4,7 +4,8 @@ zerops:
       base: python@3.11
       buildCommands:
         - cd api && pip install -r requirements.txt
-      deployFiles: api/
+      deployFiles:
+        - api/~
     run:
       base: python@3.11
       ports:
@@ -23,7 +24,8 @@ zerops:
       base: nodejs@20
       buildCommands:
         - cd gui && npm install && npm run build
-      deployFiles: gui/dist/~
+      deployFiles:
+        - gui/dist/~
       cache:
         - gui/node_modules
       envVariables:
@@ -31,4 +33,4 @@ zerops:
         VITE_API_WS_URL: wss://api-2d4c-8000.prg1.zerops.app
     run:
       base: static
-      documentRoot: /
+
