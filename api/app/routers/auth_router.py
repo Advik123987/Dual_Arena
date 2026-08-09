@@ -1,7 +1,7 @@
 """Auth endpoints: register, login, /me (token verification)."""
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import create_access_token, hash_password, verify_password
@@ -36,15 +36,17 @@ class AuthResponse(BaseModel):
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
-    """Create a new account. Nickname must be unique; password must be ≥6 chars."""
+    """Create a new account. Nickname is case-insensitive; password must be ≥6 chars."""
     clean_nick = req.nickname.strip()
     if len(clean_nick) < 2:
         raise HTTPException(400, "Nickname must be at least 2 characters.")
     if len(req.password) < 6:
         raise HTTPException(400, "Password must be at least 6 characters.")
 
-    # Check nickname taken
-    result = await db.execute(select(Player).where(Player.nickname == clean_nick))
+    # Check nickname taken (case-insensitive)
+    result = await db.execute(
+        select(Player).where(func.lower(Player.nickname) == clean_nick.lower())
+    )
     existing = result.scalar_one_or_none()
     if existing is not None:
         # If created pre-auth (no password set), claim it now!
@@ -60,7 +62,10 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
                 win_streak=existing.win_streak,
                 token=token,
             )
-        raise HTTPException(409, f"Nickname '{clean_nick}' is already registered. If this is your account, please click 'Login' above.")
+        raise HTTPException(
+            409,
+            f"Nickname '{clean_nick}' is already registered. If this is your account, please click 'Login' tab above."
+        )
 
     player = Player(
         nickname=clean_nick,
@@ -82,13 +87,18 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 @router.post("/login", response_model=AuthResponse)
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
-    """Login with nickname + password. Returns a JWT token."""
+    """Login with nickname + password. Case-insensitive nickname lookup."""
     clean_nick = req.nickname.strip()
-    result = await db.execute(select(Player).where(Player.nickname == clean_nick))
+    result = await db.execute(
+        select(Player).where(func.lower(Player.nickname) == clean_nick.lower())
+    )
     player = result.scalar_one_or_none()
 
     if player is None:
-        raise HTTPException(401, f"Nickname '{clean_nick}' not found. Please click 'Register' tab to create your account!")
+        raise HTTPException(
+            401,
+            f"Callsign '{clean_nick}' not found. Please click 'Register' tab to create your account!"
+        )
 
     # Pre-auth account: set password on first login
     if player.password_hash is None:
@@ -97,7 +107,7 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
         await db.refresh(player)
 
     if not verify_password(req.password, player.password_hash):
-        raise HTTPException(401, "Incorrect password. Please check your password and try again.")
+        raise HTTPException(401, "Incorrect password. Please verify your password and try again.")
 
     token = create_access_token(player.id, player.nickname)
     return AuthResponse(

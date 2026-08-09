@@ -30,6 +30,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include auth_router under both /api/auth and /auth for bulletproof routing
 app.include_router(auth_router)
 app.include_router(leaderboard_router, prefix="/api")
 

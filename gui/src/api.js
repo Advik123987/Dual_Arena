@@ -32,8 +32,18 @@ export async function register(nickname, password) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ nickname, password }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || "Registration failed");
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    if (!res.ok) throw new Error("API server connection failed. Please ensure backend is running.");
+  }
+  if (!res.ok) {
+    if (res.status === 404) {
+      throw new Error("Auth server endpoint not found. Ensure API server is running on port 8000.");
+    }
+    throw new Error(data?.detail || "Registration failed");
+  }
   return data;
 }
 
@@ -43,8 +53,18 @@ export async function login(nickname, password) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ nickname, password }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || "Login failed");
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    if (!res.ok) throw new Error("API server connection failed. Please ensure backend is running.");
+  }
+  if (!res.ok) {
+    if (res.status === 404) {
+      throw new Error("Auth server endpoint not found. Ensure API server is running on port 8000.");
+    }
+    throw new Error(data?.detail || "Login failed");
+  }
   return data;
 }
 
