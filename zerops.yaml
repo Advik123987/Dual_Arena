@@ -35,4 +35,7 @@ zerops:
         VITE_API_WS_URL: wss://api-2d4c-8000.prg1.zerops.app
     run:
       base: static
+      ports:
+        - port: 80
+          httpSupport: true
 
