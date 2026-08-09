@@ -14,8 +14,8 @@ zerops:
         - port: 8000
           httpSupport: true
       prepareCommands:
-        - python3 -m pip install --break-system-packages -r /home/zerops/requirements.txt
-        - apt-get update -qq && apt-get install -y default-jdk 2>/dev/null || true
+        - apt-get update -qq && apt-get install -y default-jdk gcc python3-dev 2>/dev/null || true
+        - python3 -m pip install --break-system-packages --prefer-binary --no-cache-dir -r /home/zerops/requirements.txt || python3 -m pip install --break-system-packages --no-cache-dir -r /home/zerops/requirements.txt
       envVariables:
         PORT: 8000
       start: uvicorn main:app --host 0.0.0.0 --port 8000
