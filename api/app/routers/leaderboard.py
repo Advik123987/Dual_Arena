@@ -255,3 +255,73 @@ async def get_recommendations(player_id: str, db: AsyncSession = Depends(get_db)
     recommendations = await generate_learning_recommendations(weak_areas)
     return recommendations
 
+
+# ── Daily Challenge Endpoints ──────────────────────────────────────────────────
+
+@router.get("/daily-challenge")
+async def get_daily_challenge():
+    from datetime import date
+    from app.curriculum import PROBLEM_BANK
+    today_str = date.today().isoformat()
+    # Seed index by day of year
+    day_num = date.today().timetuple().tm_yday
+    prob = PROBLEM_BANK[day_num % len(PROBLEM_BANK)]
+    return {
+        "date": today_str,
+        "bonus_rating": 30,
+        "problem": prob,
+    }
+
+
+@router.post("/daily-challenge/submit")
+async def submit_daily_challenge(req: RunTestsRequest, player_id: str, db: AsyncSession = Depends(get_db)):
+    from datetime import date
+    today_str = date.today().isoformat()
+    results = await run_problem_tests(req.problem, req.answer)
+
+    if results.get("success"):
+        player = await db.get(Player, player_id)
+        if player and player.last_daily_date != today_str:
+            player.rating += 30
+            player.daily_streak = (player.daily_streak or 0) + 1
+            player.last_daily_date = today_str
+            await db.commit()
+            return {"success": True, "already_completed": False, "new_rating": player.rating, "daily_streak": player.daily_streak, "results": results}
+        elif player:
+            return {"success": True, "already_completed": True, "new_rating": player.rating, "daily_streak": player.daily_streak, "results": results}
+
+    return {"success": False, "already_completed": False, "results": results}
+
+
+# ── Tournament Endpoints ──────────────────────────────────────────────────────
+
+@router.get("/tournaments")
+async def get_tournaments():
+    from app.tournaments import list_tournaments
+    return list_tournaments()
+
+
+@router.post("/tournaments/create")
+async def api_create_tournament(title: str, max_players: int = 4, difficulty: str = "medium", language: str = "python"):
+    from app.tournaments import create_tournament
+    return create_tournament(title, max_players, difficulty, language)
+
+
+@router.post("/tournaments/join")
+async def api_join_tournament(tournament_id: str, player_id: str, nickname: str):
+    from app.tournaments import join_tournament
+    res = join_tournament(tournament_id, player_id, nickname)
+    if "error" in res:
+        raise HTTPException(400, res["error"])
+    return res
+
+
+@router.get("/tournaments/{t_id}")
+async def api_get_tournament(t_id: str):
+    from app.tournaments import get_tournament
+    t = get_tournament(t_id)
+    if not t:
+        raise HTTPException(404, "Tournament not found")
+    return t
+
+

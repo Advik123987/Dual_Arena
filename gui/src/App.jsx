@@ -12,49 +12,27 @@ import ProfileModal from './components/ProfileModal';
 import PrivateRoomModal from './components/PrivateRoomModal';
 import ProblemBank from './components/ProblemBank';
 import LearningHub from './components/LearningHub';
+import DailyChallengeCard from './components/DailyChallengeCard';
+import TournamentModal from './components/TournamentModal';
 import { joinQueue, leaveQueue, openDuelSocket, loadSession, clearSession, verifyToken } from './api.js';
-
-function playBeep(freq = 800, duration = 0.1) {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-    osc.start(); osc.stop(ctx.currentTime + duration);
-  } catch(e) {}
-}
-
-function playWinSound() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const freqs = [523, 659, 784, 1047];
-    freqs.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.15);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.15 + 0.3);
-      osc.start(ctx.currentTime + i * 0.15);
-      osc.stop(ctx.currentTime + i * 0.15 + 0.3);
-    });
-  } catch(e) {}
-}
+import {
+  playMatchFound, playTimerPulse, playCorrect, playWrong,
+  playVictoryFanfare, playDefeat, toggleMute, getMuteState
+} from './soundManager.js';
 
 export default function App() {
   const [nickname, setNickname] = useState('');
   const [authed, setAuthed] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
+  const [muted, setMuted] = useState(getMuteState());
 
   // Tab Navigation state: 'arena' | 'problems' | 'learning' | 'leaderboard'
   const [activeTab, setActiveTab] = useState('arena');
 
-  // Modals & Spectator State
+  // Modals State
   const [selectedProfileId, setSelectedProfileId] = useState(null);
   const [showPrivateModal, setShowPrivateModal] = useState(false);
+  const [showTournamentModal, setShowTournamentModal] = useState(false);
 
   // Restore session on mount
   useEffect(() => {
@@ -92,6 +70,11 @@ export default function App() {
     setMyPlayerId('');
   };
 
+  const handleToggleMute = () => {
+    const state = toggleMute();
+    setMuted(state);
+  };
+
   // ── Game state ────────────────────────────────────────────────────────────
   const [status, setStatus] = useState('idle'); // idle | queueing | in_duel | spectating
   const [duel, setDuel] = useState(null);
@@ -123,6 +106,7 @@ export default function App() {
 
       socketRef.current = openDuelSocket(data.player_id, nickname, data.rating, data.win_streak, {
         duel_start: (msg) => {
+          playMatchFound();
           setDuel({
             ...msg,
             you: msg.player_a_id === data.player_id ? msg.player_a : msg.player_b,
@@ -132,8 +116,7 @@ export default function App() {
         },
         tick: (msg) => {
           if (duelRef.current && duelRef.current.onTick) duelRef.current.onTick(msg);
-          if (msg.remaining === 30) playBeep(600, 0.2);
-          if (msg.remaining <= 10 && msg.remaining > 0) playBeep(880, 0.1);
+          if (msg.remaining === 30 || msg.remaining === 10) playTimerPulse(msg.remaining);
         },
         commentary: (msg) => {
           if (duelRef.current && duelRef.current.onCommentary) duelRef.current.onCommentary(msg);
@@ -143,10 +126,11 @@ export default function App() {
         },
         submission_result: (msg) => {
           if (duelRef.current && duelRef.current.onSubmissionResult) duelRef.current.onSubmissionResult(msg);
+          if (msg.correct) playCorrect(); else playWrong();
         },
         duel_end: (msg) => {
           if (duelRef.current && duelRef.current.onDuelEnd) duelRef.current.onDuelEnd(msg);
-          if (msg.winner_id === data.player_id) playWinSound();
+          if (msg.winner_id === data.player_id) playVictoryFanfare(); else playDefeat();
         },
         challenge_received: (msg) => {
           setPendingChallenge(msg);
@@ -196,11 +180,11 @@ export default function App() {
 
   const handlePracticeProblem = (problem) => {
     setDuel({
-      room_id: 'practice-' + problem.id,
+      room_id: 'practice-' + (problem.id || 'prob'),
       duration: 1800,
       you: nickname,
       opponent: null,
-      difficulty: problem.difficulty,
+      difficulty: problem.difficulty || 'medium',
       language: problem.language || 'python',
       mode: 'sprint',
       solo: true,
@@ -230,6 +214,7 @@ export default function App() {
           setStatus('idle');
         },
         duel_start: (msg) => {
+          playMatchFound();
           setDuel({
             ...msg,
             you: msg.player_a_id === data.player_id ? msg.player_a : msg.player_b,
@@ -283,7 +268,7 @@ export default function App() {
 
       <header className="app-header">
         <h1>DUAL ARENA</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'center', marginTop: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', justifyContent: 'center', marginTop: '0.5rem' }}>
           <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
             👤 <strong style={{ color: 'var(--accent-cyan)', cursor: 'pointer' }} onClick={() => setSelectedProfileId(myPlayerId)}>{nickname}</strong>
             &nbsp;·&nbsp; ⭐ {myRating}
@@ -291,6 +276,9 @@ export default function App() {
           </span>
           <button className="btn-secondary" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }} onClick={() => setSelectedProfileId(myPlayerId)}>
             My Profile
+          </button>
+          <button className="btn-secondary" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }} onClick={handleToggleMute}>
+            {muted ? '🔇 Muted' : '🔊 Sound On'}
           </button>
           <button className="btn-danger" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }} onClick={handleLogout}>
             Logout
@@ -306,6 +294,9 @@ export default function App() {
       {/* Arena Tab */}
       {status === 'idle' && activeTab === 'arena' && (
         <>
+          {/* Daily Challenge Banner */}
+          <DailyChallengeCard onSolveDaily={handlePracticeProblem} />
+
           <div className="lobby-container">
             <div className="lang-toggle">
               <button className={language === 'python' ? 'active' : ''} onClick={() => setLanguage('python')}>
@@ -354,6 +345,13 @@ export default function App() {
                 onClick={() => setShowPrivateModal(true)}
               >
                 🔑 Private Room
+              </button>
+              <button
+                className="btn-secondary"
+                style={{ flex: 1 }}
+                onClick={() => setShowTournamentModal(true)}
+              >
+                🏆 Tournament
               </button>
               <button
                 className="btn-primary"
@@ -449,10 +447,18 @@ export default function App() {
           difficulty={difficulty}
           language={language}
           mode={mode}
-          onRoomJoined={(data) => {
-            setStatus('queueing');
-          }}
+          onRoomJoined={(data) => setStatus('queueing')}
           onClose={() => setShowPrivateModal(false)}
+        />
+      )}
+
+      {showTournamentModal && (
+        <TournamentModal
+          playerId={myPlayerId}
+          nickname={nickname}
+          difficulty={difficulty}
+          language={language}
+          onClose={() => setShowTournamentModal(false)}
         />
       )}
 

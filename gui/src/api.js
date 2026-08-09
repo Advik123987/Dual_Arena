@@ -163,6 +163,54 @@ export async function fetchRecommendations(playerId) {
   return res.json();
 }
 
+export async function fetchDailyChallenge() {
+  const res = await fetch(`${API_HTTP_URL}/api/daily-challenge`);
+  if (!res.ok) throw new Error("Failed to fetch daily challenge");
+  return res.json();
+}
+
+export async function submitDailyChallenge(problem, answer, playerId) {
+  const res = await fetch(`${API_HTTP_URL}/api/daily-challenge/submit?player_id=${playerId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ problem, answer }),
+  });
+  if (!res.ok) throw new Error("Failed to submit daily challenge");
+  return res.json();
+}
+
+export async function fetchTournaments() {
+  const res = await fetch(`${API_HTTP_URL}/api/tournaments`);
+  if (!res.ok) throw new Error("Failed to fetch tournaments");
+  return res.json();
+}
+
+export async function createTournament(title, maxPlayers = 4, difficulty = "medium", language = "python") {
+  const params = new URLSearchParams({ title, max_players: maxPlayers, difficulty, language });
+  const res = await fetch(`${API_HTTP_URL}/api/tournaments/create?${params.toString()}`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error("Failed to create tournament");
+  return res.json();
+}
+
+export async function joinTournament(tournamentId, playerId, nickname) {
+  const params = new URLSearchParams({ tournament_id: tournamentId, player_id: playerId, nickname });
+  const res = await fetch(`${API_HTTP_URL}/api/tournaments/join?${params.toString()}`, {
+    method: "POST",
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Failed to join tournament");
+  return data;
+}
+
+export async function fetchTournamentById(tournamentId) {
+  const res = await fetch(`${API_HTTP_URL}/api/tournaments/${tournamentId}`);
+  if (!res.ok) throw new Error("Failed to fetch tournament details");
+  return res.json();
+}
+
+
 
 // ── WebSocket ────────────────────────────────────────────────────────────────
 

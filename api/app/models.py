@@ -24,6 +24,8 @@ class Player(Base):
     wins: Mapped[int] = mapped_column(Integer, default=0)
     losses: Mapped[int] = mapped_column(Integer, default=0)
     win_streak: Mapped[int] = mapped_column(Integer, default=0)
+    daily_streak: Mapped[int] = mapped_column(Integer, default=0)
+    last_daily_date: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     weak_areas: Mapped[dict] = mapped_column(JSON, default=dict)
     achievements: Mapped[list] = mapped_column(JSON, default=list)
 
