@@ -9,48 +9,74 @@ export default function App() {
   const [duel, setDuel] = useState(null);
   const socketRef = useRef(null);
 
-  const startQueue = async () => {
+  const startQueue = async (e) => {
+    e?.preventDefault();
     if (!nickname.trim()) return;
-    setStatus("queueing");
-    const { player_id } = await joinQueue(nickname);
+    try {
+      setStatus("queueing");
+      const { player_id } = await joinQueue(nickname.trim());
 
-    // duelRef mutated in place by DuelRoom's onTick/onCommentary/etc; kept
-    // as one stable object so DuelRoom's per-render callback assignment
-    // doesn't fight with React re-renders.
-    const duelRef = { room_id: null };
+      const duelRef = { room_id: null };
 
-    const socket = openDuelSocket(player_id, {
-      duel_start: (msg) => {
-        Object.assign(duelRef, msg);
-        socketRef.current = socket;
-        setDuel(duelRef);
-        setStatus("in_duel");
-      },
-      tick: (msg) => duelRef.onTick?.(msg),
-      commentary: (msg) => duelRef.onCommentary?.(msg),
-      opponent_progress: (msg) => duelRef.onOpponentProgress?.(msg),
-      duel_end: (msg) => duelRef.onDuelEnd?.(msg),
-      onClose: () => {},
-      onError: (e) => console.error("ws error", e),
-    });
+      const socket = openDuelSocket(player_id, {
+        duel_start: (msg) => {
+          Object.assign(duelRef, msg);
+          socketRef.current = socket;
+          setDuel(duelRef);
+          setStatus("in_duel");
+        },
+        tick: (msg) => duelRef.onTick?.(msg),
+        commentary: (msg) => duelRef.onCommentary?.(msg),
+        opponent_progress: (msg) => duelRef.onOpponentProgress?.(msg),
+        duel_end: (msg) => duelRef.onDuelEnd?.(msg),
+        onClose: () => {},
+        onError: (err) => console.error("WebSocket error:", err),
+      });
+    } catch (err) {
+      console.error("Queue join failed:", err);
+      setStatus("idle");
+      alert("Failed to join queue. Make sure API server is running.");
+    }
   };
 
   return (
     <div className="app">
-      <h1>⚔️ Duel Arena</h1>
+      <header className="app-header">
+        <h1 className="app-title">⚔️ DUEL ARENA</h1>
+        <p className="app-subtitle">Real-Time AI 1v1 Algorithmic Battle Ground</p>
+        <div className="hero-badges">
+          <span className="badge">Groq Adaptive AI</span>
+          <span className="badge">Live WebSocket Sync</span>
+          <span className="badge">Zerops Cloud</span>
+        </div>
+      </header>
 
       {status === "idle" && (
-        <div className="join-panel">
-          <input
-            placeholder="Pick a nickname"
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-          />
-          <button onClick={startQueue}>Join Queue</button>
+        <div className="lobby-container">
+          <h2 className="lobby-title">Enter the Arena</h2>
+          <p className="lobby-desc">Pick your callsign and queue up against real competitors.</p>
+          <form className="join-form" onSubmit={startQueue}>
+            <input
+              className="input-field"
+              placeholder="Enter Call Sign / Nickname..."
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              autoFocus
+            />
+            <button className="btn-primary" type="submit" disabled={!nickname.trim()}>
+              ⚡ FIND MATCH
+            </button>
+          </form>
         </div>
       )}
 
-      {status === "queueing" && <p>Waiting for an opponent…</p>}
+      {status === "queueing" && (
+        <div className="queue-status">
+          <div className="spinner"></div>
+          <h3>Matchmaking in Progress...</h3>
+          <p>Analyzing competitor profiles & targeted weak areas.</p>
+        </div>
+      )}
 
       {status === "in_duel" && duel && (
         <DuelRoom
@@ -61,9 +87,12 @@ export default function App() {
       )}
 
       {status === "ended" && (
-        <div>
-          <p>Duel over.</p>
-          <button onClick={() => setStatus("idle")}>Queue again</button>
+        <div className="lobby-container">
+          <h2 className="lobby-title">Match Completed</h2>
+          <p className="lobby-desc">Your rating and targeted weak areas have been recalculated.</p>
+          <button className="btn-primary" onClick={() => setStatus("idle")}>
+            🔥 Play Again
+          </button>
         </div>
       )}
 
