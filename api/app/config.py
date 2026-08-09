@@ -20,9 +20,11 @@ settings = Settings()
 
 def normalized_database_url() -> str:
     """SQLAlchemy async needs the +asyncpg driver; Zerops/most providers hand back
-    a plain postgresql:// URL, so patch it here rather than requiring the env
+    a plain postgresql:// or postgres:// URL, so patch it here rather than requiring the env
     var itself to be SQLAlchemy-flavored."""
     url = settings.DATABASE_URL
-    if url.startswith("postgresql://"):
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif url.startswith("postgresql://"):
         url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
     return url

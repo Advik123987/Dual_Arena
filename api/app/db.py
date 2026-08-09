@@ -27,5 +27,8 @@ async def init_models():
     """Create tables on startup if they don't exist. Fine for a 48h hackathon;
     a real project would use Alembic migrations instead."""
     import app.models  # noqa: F401 ensure models are registered on Base.metadata
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as e:
+        print(f"Warning: init_models failed during startup (will retry on demand): {e}")
