@@ -3,9 +3,11 @@ zerops:
     build:
       base: python@3.11
       buildCommands:
-        - cd api && pip install -r requirements.txt
+        - cd api && pip install --target=./vendor -r requirements.txt
       deployFiles:
         - api/~
+      cache:
+        - api/vendor
     run:
       base: python@3.11
       ports:
@@ -13,7 +15,8 @@ zerops:
           httpSupport: true
       envVariables:
         PORT: 8000
-      start: uvicorn main:app --host 0.0.0.0 --port 8000
+        PYTHONPATH: ./vendor
+      start: python3 -m uvicorn main:app --host 0.0.0.0 --port 8000
       healthCheck:
         httpGet:
           port: 8000
