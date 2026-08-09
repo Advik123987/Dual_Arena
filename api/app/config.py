@@ -1,5 +1,19 @@
-"""Central settings, loaded from env vars (Zerops injects these via envSecrets)."""
+"""Central settings + mode configuration."""
 from pydantic_settings import BaseSettings
+
+MODE_DURATIONS = {
+    "rapid_fire": 300,    # 5 min
+    "sprint": 900,        # 15 min
+    "full_battle": 1800,  # 30 min
+    "marathon": 3600,     # 60 min
+}
+
+MODE_PROBLEM_TYPES = {
+    "rapid_fire": ["mcq", "short_answer"],
+    "sprint": ["mcq", "short_answer"],
+    "full_battle": ["code", "code_java"],
+    "marathon": ["code", "code_java"],
+}
 
 
 class Settings(BaseSettings):
@@ -9,7 +23,7 @@ class Settings(BaseSettings):
     GROQ_MODEL_PRIMARY: str = "llama-3.3-70b-versatile"
     GROQ_MODEL_SECONDARY: str = "llama-3.1-8b-instant"
     GROQ_MODEL_TERTIARY: str = "gemma2-9b-it"
-    DUEL_DURATION_SECONDS: int = 300
+    DUEL_DURATION_SECONDS: int = 1800
     CORS_ORIGINS: str = "*"
 
     class Config:
@@ -18,10 +32,8 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+
 def normalized_database_url() -> str:
-    """SQLAlchemy async needs the +asyncpg driver; Zerops/most providers hand back
-    a plain postgresql:// or postgres:// URL, so patch it here rather than requiring the env
-    var itself to be SQLAlchemy-flavored."""
     url = settings.DATABASE_URL
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql+asyncpg://", 1)

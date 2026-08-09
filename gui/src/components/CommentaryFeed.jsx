@@ -1,16 +1,41 @@
+import React, { useEffect, useRef } from 'react';
+
 export default function CommentaryFeed({ lines }) {
-  if (!lines || lines.length === 0) return null;
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
+  }, [lines]);
+
+  const getColor = (text) => {
+    const lower = text.toLowerCase();
+    if (lower.includes('time')) return 'var(--accent-gold)';
+    if (lower.includes('correct')) return 'var(--accent-green)';
+    if (lower.includes('wrong')) return 'var(--accent-red)';
+    return 'var(--accent-pink)';
+  };
+
+  const displayLines = lines.slice(-8);
 
   return (
     <div className="commentary-card">
-      <h4 className="commentary-title">🎙️ AI Esports Commentator</h4>
-      <ul className="commentary-list">
-        {lines.map((line, i) => (
-          <li key={i} className="commentary-item">
+      <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem' }}>🎙️ Live Commentary</h3>
+      <div ref={containerRef} style={{ maxHeight: '150px', overflowY: 'auto' }}>
+        {displayLines.map((line, index) => (
+          <div 
+            key={index} 
+            className="commentary-item"
+            style={{ 
+              animationDelay: `${index * 0.05}s`,
+              color: getColor(line)
+            }}
+          >
             {line}
-          </li>
+          </div>
         ))}
-      </ul>
+      </div>
     </div>
   );
 }

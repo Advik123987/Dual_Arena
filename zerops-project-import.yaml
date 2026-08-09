@@ -24,6 +24,7 @@ services:
       maxCpu: 2
       minRam: 0.5
       maxRam: 1
+    enableSubdomainAccess: true
     ports:
       - port: 8000
         httpSupport: true
