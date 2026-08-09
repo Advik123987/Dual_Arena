@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ParticleBackground from './components/ParticleBackground';
+import AuthScreen from './components/AuthScreen';
 import QueueCountdown from './components/QueueCountdown';
 import DuelRoom from './components/DuelRoom';
 import ActiveDuels from './components/ActiveDuels';
 import OnlinePlayers from './components/OnlinePlayers';
 import Leaderboard from './components/Leaderboard';
 import ChallengeModal from './components/ChallengeModal';
-import { joinQueue, leaveQueue, openDuelSocket } from './api';
+import { joinQueue, leaveQueue, openDuelSocket, loadSession, clearSession, verifyToken } from './api.js';
 
 function playBeep(freq = 800, duration = 0.1) {
   try {
@@ -40,6 +41,47 @@ function playWinSound() {
 
 export default function App() {
   const [nickname, setNickname] = useState('');
+  // ── Auth state ────────────────────────────────────────────────────────────
+  const [authed, setAuthed] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
+
+  // Restore session on mount
+  useEffect(() => {
+    const session = loadSession();
+    if (!session) { setAuthChecking(false); return; }
+    verifyToken(session.token).then(data => {
+      if (data) {
+        const p = session.player;
+        setNickname(p.nickname);
+        setMyPlayerId(p.player_id);
+        setMyRating(p.rating);
+        setMyWinStreak(p.win_streak);
+        setAuthed(true);
+      } else {
+        clearSession();
+      }
+    }).finally(() => setAuthChecking(false));
+  }, []);
+
+  const handleAuth = (data) => {
+    setNickname(data.nickname);
+    setMyPlayerId(data.player_id);
+    setMyRating(data.rating);
+    setMyWinStreak(data.win_streak);
+    setAuthed(true);
+  };
+
+  const handleLogout = () => {
+    clearSession();
+    if (socketRef.current) socketRef.current.close();
+    setAuthed(false);
+    setStatus('idle');
+    setDuel(null);
+    setNickname('');
+    setMyPlayerId('');
+  };
+
+  // ── Game state ────────────────────────────────────────────────────────────
   const [status, setStatus] = useState('idle'); // idle | queueing | in_duel | ended
   
   const [duel, setDuel] = useState(null);
@@ -178,12 +220,44 @@ export default function App() {
     }).catch(err => console.error(err));
   };
 
+  // ── Render ────────────────────────────────────────────────────────────────
+  if (authChecking) {
+    return (
+      <div className="app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <ParticleBackground />
+        <div style={{ textAlign: 'center' }}>
+          <div className="auth-spinner" style={{ width: 48, height: 48, margin: '0 auto 1rem' }} />
+          <p style={{ color: 'var(--text-muted)' }}>Loading arena...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authed) {
+    return (
+      <div className="app">
+        <ParticleBackground />
+        <AuthScreen onAuth={handleAuth} />
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <ParticleBackground />
       
       <header className="app-header">
         <h1>DUAL ARENA</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'center', marginTop: '0.5rem' }}>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+            👤 <strong style={{ color: 'var(--accent-cyan)' }}>{nickname}</strong>
+            &nbsp;·&nbsp; ⭐ {myRating}
+            {myWinStreak >= 2 && <span style={{ color: 'var(--accent-orange)' }}> &nbsp;🔥{myWinStreak}</span>}
+          </span>
+          <button className="btn-danger" style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }} onClick={handleLogout}>
+            Logout
+          </button>
+        </div>
       </header>
 
       {status === 'idle' && (

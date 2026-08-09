@@ -18,12 +18,14 @@ class Player(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
     nickname: Mapped[str] = mapped_column(String, unique=True, index=True)
+    password_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     rating: Mapped[int] = mapped_column(Integer, default=1000)
     wins: Mapped[int] = mapped_column(Integer, default=0)
     losses: Mapped[int] = mapped_column(Integer, default=0)
     win_streak: Mapped[int] = mapped_column(Integer, default=0)
     weak_areas: Mapped[dict] = mapped_column(JSON, default=dict)
+
 
 
 class Match(Base):

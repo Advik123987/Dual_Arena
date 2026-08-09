@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import matchmaking
 from app.config import settings
 from app.db import init_models
+from app.routers.auth_router import router as auth_router
 from app.routers.leaderboard import router as leaderboard_router
 from app.websocket_manager import (
     check_and_send_active_room, get_room, manager,
@@ -29,6 +30,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(leaderboard_router, prefix="/api")
 
 
@@ -39,8 +41,16 @@ async def health():
 
 @app.websocket("/ws/{player_id}")
 async def duel_socket(websocket: WebSocket, player_id: str):
-    # We'll update online meta after getting player info from the request header
-    nickname = websocket.query_params.get("nickname", "Unknown")
+    from app.auth import decode_access_token
+    token = websocket.query_params.get("token", "")
+    payload = decode_access_token(token) if token else None
+
+    # If token provided, verify it matches the player_id
+    if token and (payload is None or payload.get("sub") != player_id):
+        await websocket.close(code=4001)
+        return
+
+    nickname = (payload or {}).get("nickname") or websocket.query_params.get("nickname", "Unknown")
     rating = int(websocket.query_params.get("rating", "1000"))
     win_streak = int(websocket.query_params.get("win_streak", "0"))
 

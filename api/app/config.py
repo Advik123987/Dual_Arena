@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     GROQ_MODEL_TERTIARY: str = "gemma2-9b-it"
     DUEL_DURATION_SECONDS: int = 1800
     CORS_ORIGINS: str = "*"
+    SECRET_KEY: str = "change-me-in-production-use-a-long-random-string"
+    ACCESS_TOKEN_EXPIRE_HOURS: int = 168  # 7 days
 
     class Config:
         env_file = ".env"
