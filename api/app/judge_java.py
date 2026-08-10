@@ -13,6 +13,11 @@ import tempfile
 
 logger = logging.getLogger(__name__)
 
+# Check if Java is installed on this system
+JAVA_AVAILABLE = shutil.which("javac") is not None and shutil.which("java") is not None
+if not JAVA_AVAILABLE:
+    logger.warning("Java (javac/java) not found in PATH. Java judging will be unavailable.")
+
 JAVA_BOILERPLATE = """import java.util.*;
 import java.util.stream.*;
 
@@ -42,6 +47,8 @@ public class Solution {{
 
 
 def _run_java_sync(java_source: str, test_cases: list[dict]) -> bool:
+    if not JAVA_AVAILABLE:
+        return False
     tmp_dir = None
     try:
         tmp_dir = tempfile.mkdtemp(prefix="duel_java_")
@@ -85,6 +92,12 @@ def _run_java_sync(java_source: str, test_cases: list[dict]) -> bool:
 
 
 def _run_java_detailed_sync(java_source: str, test_cases: list[dict]) -> dict:
+    if not JAVA_AVAILABLE:
+        return {
+            "success": False,
+            "error": "Java runtime not available on this server. Java problems can only be submitted in local mode.",
+            "test_results": [],
+        }
     tmp_dir = None
     results = []
     try:
@@ -151,6 +164,8 @@ def _run_java_detailed_sync(java_source: str, test_cases: list[dict]) -> dict:
 
 
 async def judge_java_submission(problem: dict, user_code: str) -> bool:
+    if not JAVA_AVAILABLE:
+        return False
     test_cases = problem.get("test_cases", [])
     if not test_cases:
         return False
@@ -165,6 +180,12 @@ async def judge_java_submission(problem: dict, user_code: str) -> bool:
 
 
 async def run_java_tests(problem: dict, user_code: str) -> dict:
+    if not JAVA_AVAILABLE:
+        return {
+            "success": False,
+            "error": "Java runtime not available on this server.",
+            "test_results": [],
+        }
     test_cases = problem.get("test_cases", [])
     java_source = _normalize_java_code(user_code)
     try:
