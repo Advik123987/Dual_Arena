@@ -483,7 +483,7 @@ export default function App() {
       {showAuthModal && (
         <div className="challenge-modal-overlay" onClick={() => setShowAuthModal(false)}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '440px' }}>
-            <AuthScreen onAuth={handleAuth} />
+            <AuthScreen onAuth={handleAuth} onClose={() => setShowAuthModal(false)} />
           </div>
         </div>
       )}

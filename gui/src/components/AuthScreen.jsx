@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { register, login, saveSession } from '../api.js';
 
-export default function AuthScreen({ onAuth }) {
+export default function AuthScreen({ onAuth, onClose }) {
   const [mode, setMode] = useState('register'); // Default to 'register' for new competitors
   const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
@@ -13,7 +13,8 @@ export default function AuthScreen({ onAuth }) {
     e.preventDefault();
     setError('');
 
-    if (!nickname.trim()) return setError('Please enter a nickname.');
+    const cleanNick = nickname.trim();
+    if (!cleanNick) return setError('Please enter a competitor nickname.');
     if (password.length < 6) return setError('Password must be at least 6 characters.');
     if (mode === 'register' && password !== confirmPassword)
       return setError('Passwords do not match. Please re-type your password.');
@@ -21,8 +22,8 @@ export default function AuthScreen({ onAuth }) {
     setLoading(true);
     try {
       const data = mode === 'register'
-        ? await register(nickname.trim(), password)
-        : await login(nickname.trim(), password);
+        ? await register(cleanNick, password)
+        : await login(cleanNick, password);
 
       saveSession(data.token, {
         player_id: data.player_id,
@@ -32,7 +33,7 @@ export default function AuthScreen({ onAuth }) {
       });
       onAuth(data);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Authentication failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -40,7 +41,17 @@ export default function AuthScreen({ onAuth }) {
 
   return (
     <div className="auth-screen">
-      <div className="auth-card">
+      <div className="auth-card" style={{ position: 'relative' }}>
+        {onClose && (
+          <button
+            className="profile-close-btn"
+            onClick={onClose}
+            style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 10 }}
+          >
+            ×
+          </button>
+        )}
+
         {/* Logo */}
         <div className="auth-logo">
           <span className="auth-logo-icon">⚔️</span>
@@ -51,12 +62,14 @@ export default function AuthScreen({ onAuth }) {
         {/* Tab Toggle */}
         <div className="auth-tabs">
           <button
+            type="button"
             className={`auth-tab ${mode === 'register' ? 'active' : ''}`}
             onClick={() => { setMode('register'); setError(''); }}
           >
             🚀 Register Account
           </button>
           <button
+            type="button"
             className={`auth-tab ${mode === 'login' ? 'active' : ''}`}
             onClick={() => { setMode('login'); setError(''); }}
           >
@@ -150,8 +163,8 @@ export default function AuthScreen({ onAuth }) {
         {/* Footnote */}
         <p className="auth-footer">
           {mode === 'register'
-            ? <>Already registered? <button className="auth-link" onClick={() => { setMode('login'); setError(''); }}>Log in here</button></>
-            : <>New competitor? <button className="auth-link" onClick={() => { setMode('register'); setError(''); }}>Create account</button></>
+            ? <>Already registered? <button type="button" className="auth-link" onClick={() => { setMode('login'); setError(''); }}>Log in here</button></>
+            : <>New competitor? <button type="button" className="auth-link" onClick={() => { setMode('register'); setError(''); }}>Create account</button></>
           }
         </p>
 
