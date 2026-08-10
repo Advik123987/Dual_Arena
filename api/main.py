@@ -25,17 +25,16 @@ app = FastAPI(title="Duel Arena API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS.split(",") if settings.CORS_ORIGINS != "*" else ["*"],
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=False,
 )
 
-# Include routers under root AND /api prefix for bulletproof routing
+# Auth router is already prefixed /api/auth internally
 app.include_router(auth_router)
-app.include_router(auth_router, prefix="/api/auth")
-app.include_router(auth_router, prefix="/auth")
 
-app.include_router(leaderboard_router)
+# Leaderboard/game router — all routes are prefixed /api inside leaderboard.py
 app.include_router(leaderboard_router, prefix="/api")
 
 

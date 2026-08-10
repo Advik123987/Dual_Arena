@@ -8,7 +8,7 @@ from app.auth import create_access_token, hash_password, verify_password
 from app.db import get_db
 from app.models import Player
 
-router = APIRouter(tags=["auth"])
+router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -35,8 +35,6 @@ class AuthResponse(BaseModel):
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-@router.post("/api/auth/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
-@router.post("/auth/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
     """Create a new account. Nickname is case-insensitive; password must be ≥6 chars."""
     clean_nick = req.nickname.strip()
@@ -66,7 +64,7 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
             )
         raise HTTPException(
             409,
-            f"Nickname '{clean_nick}' is already registered. If this is your account, please click 'Login' tab above."
+            f"Nickname '{clean_nick}' is already registered. Please click 'Login' tab above."
         )
 
     player = Player(
@@ -88,8 +86,6 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login", response_model=AuthResponse)
-@router.post("/api/auth/login", response_model=AuthResponse, include_in_schema=False)
-@router.post("/auth/login", response_model=AuthResponse, include_in_schema=False)
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     """Login with nickname + password. Case-insensitive nickname lookup."""
     clean_nick = req.nickname.strip()
@@ -124,8 +120,6 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/me")
-@router.get("/api/auth/me", include_in_schema=False)
-@router.get("/auth/me", include_in_schema=False)
 async def get_me(token: str, db: AsyncSession = Depends(get_db)):
     """Verify a token and return the player info. Used by frontend on app load."""
     from app.auth import decode_access_token
