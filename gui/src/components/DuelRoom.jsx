@@ -21,22 +21,45 @@ export default function DuelRoom({ duel, myPlayerId, socket, onEnd, isSpectator 
     }
   }, [duel]);
 
+  const isMounted = useRef(true);
+
   useEffect(() => {
-    duel.onTick = (data) => setRemaining(data.remaining);
-    duel.onCommentary = (data) => setLines(prev => [...prev, data.message || data.line]);
+    isMounted.current = true;
+
+    duel.onTick = (data) => {
+      if (isMounted.current) setRemaining(data.remaining);
+    };
+    duel.onCommentary = (data) => {
+      if (isMounted.current) setLines(prev => [...prev, data.message || data.line]);
+    };
     duel.onOpponentProgress = (data) => {
-      setOpponentStatus('active');
-      setTimeout(() => setOpponentStatus('idle'), 2500);
+      if (isMounted.current) {
+        setOpponentStatus('active');
+        setTimeout(() => { if (isMounted.current) setOpponentStatus('idle'); }, 2500);
+      }
     };
     duel.onSubmissionResult = (data) => {
-      setSubmitFlash(data.correct ? 'correct' : 'wrong');
-      setTimeout(() => setSubmitFlash(null), 800);
+      if (isMounted.current) {
+        setSubmitFlash(data.correct ? 'correct' : 'wrong');
+        setTimeout(() => { if (isMounted.current) setSubmitFlash(null); }, 800);
+      }
     };
     duel.onDuelEnd = (data) => {
-      setResult(data);
-      if (data.winner_id === myPlayerId && window.confetti) {
-        window.confetti({ particleCount: 180, spread: 80, origin: { y: 0.6 } });
+      if (isMounted.current) {
+        setResult(data);
+        if (data.winner_id === myPlayerId && window.confetti) {
+          window.confetti({ particleCount: 180, spread: 80, origin: { y: 0.6 } });
+        }
       }
+    };
+
+    return () => {
+      isMounted.current = false;
+      delete duel.onTick;
+      delete duel.onCommentary;
+      delete duel.onOpponentProgress;
+      delete duel.onSubmissionResult;
+      delete duel.onDuelEnd;
     };
   }, [duel, myPlayerId]);
 

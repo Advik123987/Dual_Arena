@@ -15,6 +15,7 @@ import LearningHub from './components/LearningHub';
 import DailyChallengeCard from './components/DailyChallengeCard';
 import TournamentModal from './components/TournamentModal';
 import HomePage from './components/HomePage';
+import DualArenaLogo from './components/DualArenaLogo';
 import { joinQueue, leaveQueue, openDuelSocket, loadSession, clearSession, verifyToken } from './api.js';
 import {
   playMatchFound, playTimerPulse, playCorrect, playWrong,
@@ -262,8 +263,8 @@ export default function App() {
       <ParticleBackground />
 
       <header className="app-header">
-        <h1 style={{ cursor: 'pointer' }} onClick={() => setActiveTab('home')}>DUAL ARENA</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', justifyContent: 'center', marginTop: '0.5rem' }}>
+        <DualArenaLogo size="large" onClick={() => setActiveTab('home')} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', justifyContent: 'center', marginTop: '0.8rem' }}>
           {authed ? (
             <>
               <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
@@ -391,6 +392,7 @@ export default function App() {
               mode={mode}
               socket={socketRef.current}
               myNickname={nickname}
+              onChallenge={handleLeaderboardChallenge}
             />
           </div>
         </>

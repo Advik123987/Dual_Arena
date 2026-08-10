@@ -1443,6 +1443,112 @@ body::before {
   line-height: 1.4;
 }
 
+/* ── High-Tech Esports Logo & Color Grading System ─────────────────────────── */
+
+.dual-arena-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+  user-select: none;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.dual-arena-logo:hover {
+  transform: scale(1.03);
+}
+
+.logo-emblem-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-glow-ring {
+  position: absolute;
+  top: -4px; left: -4px; right: -4px; bottom: -4px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, var(--accent-cyan), var(--accent-pink), var(--accent-purple), var(--accent-cyan));
+  filter: blur(8px);
+  opacity: 0.7;
+  animation: logoSpinRing 8s linear infinite;
+  z-index: 0;
+}
+
+.logo-icon {
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 0 10px rgba(0, 243, 255, 0.8));
+  display: inline-block;
+  animation: logoPulseIcon 3s ease-in-out infinite;
+}
+
+.logo-text {
+  font-family: var(--font-sans);
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #ffffff 0%, #d0e0ff 50%, var(--accent-cyan) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 12px rgba(0, 243, 255, 0.35));
+}
+
+.logo-text-accent {
+  background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-pink) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-left: 2px;
+}
+
+@keyframes logoSpinRing {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes logoPulseIcon {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px rgba(0, 243, 255, 0.8)); }
+  50% { transform: scale(1.08); filter: drop-shadow(0 0 20px rgba(255, 0, 127, 0.9)); }
+}
+
+/* Glassmorphism & High-Contrast Visual Refinements */
+.lobby-container, .leaderboard-container, .problem-bank-container, .learning-hub-container, .auth-card {
+  background: var(--bg-card) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(0, 243, 255, 0.15) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+.auth-card {
+  border-radius: 20px !important;
+}
+
+/* Polished Button Effects */
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 100%) !important;
+  color: #040711 !important;
+  font-weight: 800 !important;
+  box-shadow: 0 4px 20px rgba(0, 243, 255, 0.35) !important;
+  transition: all 0.25s ease-out !important;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 30px rgba(0, 243, 255, 0.6) !important;
+}
+
+.btn-solo {
+  background: linear-gradient(135deg, var(--accent-pink) 0%, var(--accent-purple) 100%) !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  box-shadow: 0 4px 20px rgba(255, 0, 127, 0.4) !important;
+  transition: all 0.25s ease-out !important;
+}
+
+.btn-solo:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 30px rgba(255, 0, 127, 0.7) !important;
+}
+
 
 
 

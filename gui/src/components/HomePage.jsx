@@ -1,10 +1,14 @@
 import React from 'react';
+import DualArenaLogo from './DualArenaLogo';
 
 export default function HomePage({ authed, onNavigate, onOpenAuth }) {
   return (
     <div className="home-page-container">
       {/* Hero Section */}
       <section className="hero-section">
+        <div style={{ marginBottom: '1rem' }}>
+          <DualArenaLogo size="large" />
+        </div>
         <div className="hero-badge">🔥 THE NEXT-GEN 1V1 COMPETITIVE CODING ARENA</div>
         <h1 className="hero-title">
           Master Code. Crush Rivals.<br />

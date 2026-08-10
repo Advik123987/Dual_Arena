@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { register, login, saveSession } from '../api.js';
+import DualArenaLogo from './DualArenaLogo';
 
 export default function AuthScreen({ onAuth, onClose }) {
   const [mode, setMode] = useState('register'); // Default to 'register' for new competitors
@@ -53,10 +54,9 @@ export default function AuthScreen({ onAuth, onClose }) {
         )}
 
         {/* Logo */}
-        <div className="auth-logo">
-          <span className="auth-logo-icon">⚔️</span>
-          <h1 className="auth-title">DUAL ARENA</h1>
-          <p className="auth-subtitle">Real-Time AI 1v1 Coding Battle Platform</p>
+        <div className="auth-logo" style={{ marginBottom: '1.2rem' }}>
+          <DualArenaLogo size="medium" />
+          <p className="auth-subtitle" style={{ marginTop: '0.4rem' }}>Real-Time AI 1v1 Coding Battle Platform</p>
         </div>
 
         {/* Tab Toggle */}
