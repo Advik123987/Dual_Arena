@@ -54,8 +54,9 @@ async def join_queue(req: JoinQueueRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.delete("/queue/leave")
-async def leave_queue(player_id: str):
-    await matchmaking.dequeue(player_id)
+@router.post("/queue/leave")
+async def leave_queue(player_id: str | None = None, nickname: str | None = None):
+    await matchmaking.dequeue(player_id, nickname)
     return {"status": "removed"}
 
 

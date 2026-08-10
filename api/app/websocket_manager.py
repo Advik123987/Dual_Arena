@@ -46,10 +46,18 @@ class ConnectionManager:
             await self.send(pid, message)
 
     def get_online_players(self) -> list[dict]:
-        return [
-            {"player_id": pid, **meta, "tier": get_rank_tier(meta.get("rating", 1000))}
-            for pid, meta in self.online_meta.items()
-        ]
+        seen_nicks = set()
+        unique_players = []
+        for pid, meta in self.online_meta.items():
+            nick = meta.get("nickname", "").strip().lower()
+            if nick and nick not in seen_nicks:
+                seen_nicks.add(nick)
+                unique_players.append({
+                    "player_id": pid,
+                    **meta,
+                    "tier": get_rank_tier(meta.get("rating", 1000)),
+                })
+        return unique_players
 
 
 manager = ConnectionManager()

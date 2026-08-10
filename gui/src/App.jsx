@@ -422,8 +422,23 @@ export default function App() {
           mode={mode}
           nickname={nickname}
           playerId={myPlayerId}
-          onSolo={() => {}}
+          onSolo={(soloData) => {
+            if (socketRef.current) socketRef.current.close();
+            setDuel({
+              room_id: soloData?.room_id || ('solo-' + Date.now()),
+              duration: 1800,
+              you: nickname,
+              opponent: null,
+              difficulty: difficulty,
+              language: language,
+              mode: mode,
+              solo: true,
+              problem: { category: "arrays", prompt: "Starting solo duel against the clock...", type: "code" }
+            });
+            setStatus('in_duel');
+          }}
           onKeepWaiting={() => {}}
+          onCancel={handleCancelQueue}
         />
       )}
 
@@ -488,11 +503,6 @@ export default function App() {
         </div>
       )}
 
-      {status === 'queueing' && !pendingChallenge && (
-        <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-          <button className="btn-danger" onClick={handleCancelQueue}>Cancel Queue</button>
-        </div>
-      )}
     </div>
   );
 }

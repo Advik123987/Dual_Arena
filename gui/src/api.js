@@ -114,8 +114,15 @@ export async function joinQueue(nickname, difficulty = "medium", language = "pyt
   return res.json();
 }
 
-export async function leaveQueue(playerId) {
-  await smartFetch(`/api/queue/leave/${playerId}`, { method: "POST" });
+export async function leaveQueue(playerId, nickname) {
+  const params = new URLSearchParams();
+  if (playerId) params.append("player_id", playerId);
+  if (nickname) params.append("nickname", nickname);
+  try {
+    await smartFetch(`/api/queue/leave?${params.toString()}`, { method: "POST" });
+  } catch (err) {
+    console.warn("leaveQueue warning:", err);
+  }
 }
 
 export async function startSoloMatch(playerId, nickname, difficulty = "medium", language = "python", mode = "full_battle") {
