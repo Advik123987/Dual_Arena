@@ -1,45 +1,54 @@
-"""Auth utilities: password hashing (bcrypt + sha256 fallback) + JWT tokens (python-jose).
+"""Auth utilities: password hashing (SHA256, no external C deps) + JWT tokens (PyJWT, pure Python).
 
 Token payload: {"sub": player_id, "nickname": nickname, "exp": ...}
 """
 import hashlib
+import hmac
 from datetime import datetime, timedelta, timezone
 
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+import jwt  # PyJWT — pure Python, no Rust/C deps
 
 from app.config import settings
 
-_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 ALGORITHM = "HS256"
 
 
-# ── Password helpers ──────────────────────────────────────────────────────────
+# ── Password helpers (SHA-256 HMAC — no bcrypt/cryptography C dep) ─────────────
 
-def _fallback_hash(plain: str) -> str:
-    salt = settings.SECRET_KEY[:16]
-    return "sha256$" + hashlib.sha256((salt + plain).encode("utf-8")).hexdigest()
+def _hmac_hash(plain: str) -> str:
+    """HMAC-SHA256 password hash using SECRET_KEY as salt."""
+    return "hmac256$" + hmac.new(
+        settings.SECRET_KEY.encode("utf-8"),
+        plain.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
 
 
 def hash_password(plain: str) -> str:
-    try:
-        return _pwd_context.hash(plain)
-    except Exception:
-        return _fallback_hash(plain)
+    return _hmac_hash(plain)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     if not hashed:
         return False
+    # Support legacy sha256$ prefix from old fallback
     if hashed.startswith("sha256$"):
-        return _fallback_hash(plain) == hashed
+        salt = settings.SECRET_KEY[:16]
+        legacy = "sha256$" + hashlib.sha256((salt + plain).encode("utf-8")).hexdigest()
+        return hmac.compare_digest(legacy, hashed)
+    if hashed.startswith("hmac256$"):
+        return hmac.compare_digest(_hmac_hash(plain), hashed)
+    # Passlib bcrypt hash from old deployments — try passlib if available
     try:
-        return _pwd_context.verify(plain, hashed)
+        from passlib.context import CryptContext
+        ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        return ctx.verify(plain, hashed)
     except Exception:
-        return _fallback_hash(plain) == hashed
+        pass
+    return False
 
 
-# ── JWT helpers ───────────────────────────────────────────────────────────────
+# ── JWT helpers (PyJWT — pure Python) ────────────────────────────────────────
 
 def create_access_token(player_id: str, nickname: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(hours=settings.ACCESS_TOKEN_EXPIRE_HOURS)
@@ -51,5 +60,5 @@ def decode_access_token(token: str) -> dict | None:
     """Returns payload dict or None if invalid / expired."""
     try:
         return jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
-    except JWTError:
+    except jwt.PyJWTError:
         return None
