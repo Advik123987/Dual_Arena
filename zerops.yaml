@@ -5,7 +5,7 @@ zerops:
       buildCommands:
         - echo "build step"
       addToRunPrepare:
-        - api/requirements.txt
+        - requirements.txt
       deployFiles:
         - api/~
     run:
